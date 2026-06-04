@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Criar conta | NexFinance</title>
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  <main class="login-container">
+    <section class="login-box">
+      <a class="brand" href="index.html">
+        <img class="brand-logo" src="img/LOGO-NEX.png.png" alt="NexFinance - Seu Sucesso, Nossa Inteligência">
+      </a>
+
+      <h1>Criar conta</h1>
+      <p>Cadastre sua empresa e comece a acompanhar indicadores financeiros em poucos minutos.</p>
+
+      <form id="registerForm">
+        <label for="name">Nome</label>
+        <input type="text" id="name" placeholder="Seu nome completo" required>
+
+        <label for="email">E-mail</label>
+        <input type="email" id="email" placeholder="seu@email.com" required>
+
+        <label for="password">Senha</label>
+        <input type="password" id="password" placeholder="Mínimo de 6 caracteres" required>
+
+        <label for="company">Nome da empresa</label>
+        <input type="text" id="company" placeholder="Ex: NexFoods Comércio LTDA">
+
+        <label for="cnpj">CNPJ</label>
+        <input type="text" id="cnpj" placeholder="00.000.000/0001-00">
+
+        <button type="submit" class="btn-primary">Criar conta</button>
+        <div id="registerMessage" class="message" aria-live="polite"></div>
+      </form>
+
+      <div class="register-text">Já tem uma conta? <a href="login.html">Entrar</a></div>
+    </section>
+
+    <section class="info-panel">
+      <span class="badge">Onboarding rápido</span>
+      <h2>Da planilha ao dashboard em uma experiência simples.</h2>
+      <p>Depois do cadastro, você pode registrar receitas, despesas, clientes, fornecedores e usar a IA para gerar próximos passos.</p>
+    </section>
+  </main>
+
+  <script src="cadastro.js"></script>
+</body>
+</html>

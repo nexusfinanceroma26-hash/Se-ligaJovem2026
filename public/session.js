@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000/api";
+const API_URL = "/api";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const token = localStorage.getItem("nexfinance_token");
@@ -16,17 +16,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     if (!response.ok) {
-      localStorage.removeItem("nexfinance_token");
-      localStorage.removeItem("nexfinance_user");
-      window.location.href = "login.html";
+      clearSession();
       return;
     }
 
     const data = await response.json();
     console.log("Sessão válida:", data.user);
   } catch (error) {
-    localStorage.removeItem("nexfinance_token");
-    localStorage.removeItem("nexfinance_user");
-    window.location.href = "login.html";
+    clearSession();
   }
 });
+
+function clearSession() {
+  localStorage.removeItem("nexfinance_token");
+  localStorage.removeItem("nexfinance_user");
+  window.location.href = "login.html";
+}

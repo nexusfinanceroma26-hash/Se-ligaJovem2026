@@ -1,32 +1,44 @@
 const API_URL = "http://localhost:3000/api";
 
-document.addEventListener("DOMContentLoaded", async () => {
-  const token = localStorage.getItem("nexfinance_token");
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("cadastroForm");
 
-  if (!token) {
-    window.location.href = "login.html";
-    return;
-  }
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
 
-  try {
-    const response = await fetch(`${API_URL}/auth/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`
+    const name = document.getElementById("name").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value.trim();
+
+    try {
+      const response = await fetch(`${API_URL}/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          password
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Erro ao criar conta.");
+        return;
       }
-    });
 
-    if (!response.ok) {
-      localStorage.removeItem("nexfinance_token");
-      localStorage.removeItem("nexfinance_user");
-      window.location.href = "login.html";
-      return;
+      alert("Conta criada com sucesso!");
+
+      localStorage.setItem("nexfinance_token", data.token);
+      localStorage.setItem("nexfinance_user", JSON.stringify(data.user));
+
+      window.location.href = "dashboard.html";
+    } catch (error) {
+      alert("Erro ao conectar com o servidor.");
+      console.error(error);
     }
-
-    const data = await response.json();
-    console.log("Sessão válida:", data.user);
-  } catch (error) {
-    localStorage.removeItem("nexfinance_token");
-    localStorage.removeItem("nexfinance_user");
-    window.location.href = "login.html";
-  }
+  });
 });

@@ -5,6 +5,7 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 dotenv.config();
 
@@ -22,11 +23,15 @@ function readUsers() {
   }
 
   const data = fs.readFileSync(USERS_FILE, "utf-8");
-  return JSON.parse(data);
+  return JSON.parse(data || "[]");
 }
 
 function saveUsers(users) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+function getJwtSecret() {
+  return process.env.JWT_SECRET || "nexfinance_dev_secret_change_me";
 }
 
 function generateToken(user) {
@@ -37,7 +42,7 @@ function generateToken(user) {
       email: user.email,
       role: user.role
     },
-    process.env.JWT_SECRET,
+    getJwtSecret(),
     {
       expiresIn: process.env.JWT_EXPIRES_IN || "2h"
     }
@@ -70,7 +75,7 @@ function authMiddleware(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret());
     req.user = decoded;
     next();
   } catch (error) {
@@ -84,6 +89,10 @@ function validateEmail(email) {
   const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return regex.test(email);
 }
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 // Registro de usuário
 app.post("/api/auth/register", async (req, res) => {
@@ -108,7 +117,6 @@ app.post("/api/auth/register", async (req, res) => {
   }
 
   const users = readUsers();
-
   const userExists = users.find((user) => user.email === email);
 
   if (userExists) {
@@ -156,8 +164,7 @@ app.post("/api/auth/login", async (req, res) => {
   }
 
   const users = readUsers();
-
-  const user = users.find((user) => user.email === email);
+  const user = users.find((item) => item.email === email);
 
   if (!user) {
     return res.status(401).json({
@@ -206,7 +213,7 @@ app.post("/api/auth/forgot-password", (req, res) => {
   }
 
   const users = readUsers();
-  const user = users.find((user) => user.email === email);
+  const user = users.find((item) => item.email === email);
 
   if (!user) {
     return res.status(404).json({
@@ -220,7 +227,7 @@ app.post("/api/auth/forgot-password", (req, res) => {
       email: user.email,
       type: "password_reset"
     },
-    process.env.JWT_SECRET,
+    getJwtSecret(),
     {
       expiresIn: "15m"
     }
@@ -252,7 +259,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret());
 
     if (decoded.type !== "password_reset") {
       return res.status(401).json({

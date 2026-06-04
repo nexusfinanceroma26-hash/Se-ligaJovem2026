@@ -1,21 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title></title>
-    <link rel="stylesheet" href="login.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrar | NexFinance</title>
+  <link rel="stylesheet" href="login.css">
 </head>
 <body>
-    <main class="login-container">
-
+  <main class="login-container">
     <section class="login-box">
-      <img src="img/LOGO-NEX.png.png" alt="Logo NexFinance" class="logo">
+      <a class="brand" href="index.html">
+        <img class="brand-logo" src="img/LOGO-NEX.png.png" alt="NexFinance - Seu Sucesso, Nossa Inteligência">
+      </a>
 
-      <h1>Bem-vindo de volta!</h1>
+      <h1>Bem-vindo de volta</h1>
       <p>Acesse sua conta e continue gerenciando seu negócio com inteligência.</p>
 
-      <form action="/login" method="post">
+      <form id="loginForm">
         <label for="username">E-mail</label>
         <input type="email" id="username" name="username" placeholder="seu@email.com" required>
 
@@ -25,30 +26,23 @@
         <a href="esqueci.html" class="forgot">Esqueci minha senha</a>
 
         <button type="submit" class="btn-primary">Entrar</button>
+        <button type="button" class="btn-secondary" onclick="window.location.href='cadastro.html'">Criar conta</button>
 
-        <button type="button" class="btn-secondary" onclick="window.location.href='entrar.html'">
-          Continuar com Google
-        </button>
-
-        <div class="register-text">
-          Não tem uma conta?
-          <a href="cadastro.html">Criar Conta</a>
-        </div>
+        <div id="loginMessage" class="message" aria-live="polite"></div>
 
         <div class="terms">
-          Ao criar uma conta, você concorda com nossos
-          <a href="termos.html">Termos de Serviço</a> e
-          <a href="privacidade.html">Política de Privacidade</a>.
+          Ao acessar, você concorda com os Termos de Serviço e a Política de Privacidade da NexFinance.
         </div>
       </form>
 
       <a href="index.html" class="back-link">Voltar para a página inicial</a>
     </section>
 
-    <section class="image-box">
-      <img src="img/Mascote-png.png" alt="Mascote NexFinance" class="mascote">
-      <div class="image-text">
-      
-<script src="login.js"></script>
+    <section class="mascot-panel" aria-label="Mascote NexFinance">
+      <img src="img/Mascote-png.png" alt="Nexy, mascote financeiro da NexFinance">
+    </section>
+  </main>
+
+  <script src="login.js"></script>
 </body>
 </html>
