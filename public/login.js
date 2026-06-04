@@ -1,52 +1,112 @@
-const API_URL = "/api";
-
 document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("loginForm");
-  const message = document.getElementById("loginMessage");
+  console.log("login.js carregado com sucesso");
 
-  if (!form) return;
+  const loginForm = document.querySelector("#loginForm");
+  const emailInput = document.querySelector("#username");
+  const passwordInput = document.querySelector("#password");
+  const messageBox = document.querySelector("#loginMessage");
+  const submitButton = loginForm?.querySelector("button[type='submit']");
 
-  form.addEventListener("submit", async (event) => {
+  if (!loginForm) {
+    console.error("Formulário #loginForm não encontrado.");
+    return;
+  }
+
+  loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const email = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value.trim();
+    console.log("Formulário interceptado pelo login.js");
 
-    setMessage(message, "");
+    const email = emailInput.value.trim();
+    const password = passwordInput.value.trim();
+
+    clearMessage();
 
     if (!email || !password) {
-      setMessage(message, "Preencha e-mail e senha.", "error");
+      showMessage("Preencha o e-mail e a senha.", "error");
       return;
     }
 
+    setLoading(true);
+
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          password
+        })
       });
+
+      const contentType = response.headers.get("content-type");
+
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("Resposta não JSON:", text);
+        showMessage("Erro: o servidor não retornou JSON.", "error");
+        return;
+      }
 
       const data = await response.json();
 
-      if (!response.ok) {
-        setMessage(message, data.message || "Erro ao fazer login.", "error");
+      if (!response.ok || !data.success) {
+        showMessage(data.message || "E-mail ou senha incorretos.", "error");
         return;
       }
 
       localStorage.setItem("nexfinance_token", data.token);
       localStorage.setItem("nexfinance_user", JSON.stringify(data.user));
 
-      setMessage(message, "Login realizado com sucesso.", "success");
-      window.location.href = "dashboard.html";
+      showMessage("Login realizado com sucesso. Redirecionando...", "success");
+
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 700);
+
     } catch (error) {
-      setMessage(message, "Erro ao conectar com o servidor.", "error");
-      console.error(error);
+      console.error("Erro ao fazer login:", error);
+      showMessage("Não foi possível conectar ao servidor.", "error");
+    } finally {
+      setLoading(false);
     }
   });
-});
 
-function setMessage(element, text, type) {
-  if (!element) return;
-  element.textContent = text;
-  element.className = `message ${type || ""}`;
-}
+  function showMessage(message, type) {
+    if (!messageBox) {
+      alert(message);
+      return;
+    }
+
+    messageBox.textContent = message;
+    messageBox.style.display = "block";
+    messageBox.style.padding = "12px";
+    messageBox.style.borderRadius = "10px";
+    messageBox.style.marginTop = "12px";
+    messageBox.style.fontWeight = "600";
+
+    if (type === "success") {
+      messageBox.style.color = "#00856f";
+      messageBox.style.background = "#e6fffa";
+      messageBox.style.border = "1px solid #14b8a6";
+    } else {
+      messageBox.style.color = "#b91c1c";
+      messageBox.style.background = "#fee2e2";
+      messageBox.style.border = "1px solid #ef4444";
+    }
+  }
+
+  function clearMessage() {
+    if (!messageBox) return;
+    messageBox.textContent = "";
+    messageBox.style.display = "none";
+  }
+
+  function setLoading(isLoading) {
+    if (!submitButton) return;
+    submitButton.disabled = isLoading;
+    submitButton.textContent = isLoading ? "Entrando..." : "Entrar";
+  }
+});

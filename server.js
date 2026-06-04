@@ -1,310 +1,219 @@
 const express = require("express");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
 const cors = require("cors");
-const dotenv = require("dotenv");
-const fs = require("fs");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const path = require("path");
-const crypto = require("crypto");
-
-dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const USERS_FILE = path.join(__dirname, "users.json");
 
+const PORT = 3000;
+const JWT_SECRET = "nexfinance_secret_key_dev";
+
+// Middlewares
 app.use(cors());
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.urlencoded({ extended: true }));
 
-function readUsers() {
-  if (!fs.existsSync(USERS_FILE)) {
-    fs.writeFileSync(USERS_FILE, JSON.stringify([]));
-  }
+// Servir arquivos estáticos da pasta public
+app.use(express.static(path.join(__dirname, "public")));
 
-  const data = fs.readFileSync(USERS_FILE, "utf-8");
-  return JSON.parse(data || "[]");
-}
+// Banco fake em memória para teste
+const users = [];
 
-function saveUsers(users) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-}
+// Usuário padrão para teste
+const defaultPasswordHash = bcrypt.hashSync("123456", 10);
 
-function getJwtSecret() {
-  return process.env.JWT_SECRET || "nexfinance_dev_secret_change_me";
-}
+users.push({
+  id: 1,
+  name: "Usuário Teste",
+  email: "teste@nexfinance.com",
+  passwordHash: defaultPasswordHash,
+});
 
-function generateToken(user) {
-  return jwt.sign(
-    {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role
-    },
-    getJwtSecret(),
-    {
-      expiresIn: process.env.JWT_EXPIRES_IN || "2h"
-    }
-  );
-}
-
-function authMiddleware(req, res, next) {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    return res.status(401).json({
-      message: "Token não enviado."
-    });
-  }
-
-  const parts = authHeader.split(" ");
-
-  if (parts.length !== 2) {
-    return res.status(401).json({
-      message: "Token inválido."
-    });
-  }
-
-  const [scheme, token] = parts;
-
-  if (scheme !== "Bearer") {
-    return res.status(401).json({
-      message: "Formato de token inválido."
-    });
-  }
-
-  try {
-    const decoded = jwt.verify(token, getJwtSecret());
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({
-      message: "Sessão expirada ou token inválido."
-    });
-  }
-}
-
-function validateEmail(email) {
-  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return regex.test(email);
-}
-
+// Rota inicial
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.sendFile(path.join(__dirname, "public", "login.html"));
 });
 
-// Registro de usuário
+// Rota de cadastro
 app.post("/api/auth/register", async (req, res) => {
-  const { name, email, password } = req.body;
-
-  if (!name || !email || !password) {
-    return res.status(400).json({
-      message: "Nome, e-mail e senha são obrigatórios."
-    });
-  }
-
-  if (!validateEmail(email)) {
-    return res.status(400).json({
-      message: "E-mail inválido."
-    });
-  }
-
-  if (password.length < 6) {
-    return res.status(400).json({
-      message: "A senha precisa ter pelo menos 6 caracteres."
-    });
-  }
-
-  const users = readUsers();
-  const userExists = users.find((user) => user.email === email);
-
-  if (userExists) {
-    return res.status(409).json({
-      message: "Este e-mail já está cadastrado."
-    });
-  }
-
-  const passwordHash = await bcrypt.hash(password, 12);
-
-  const newUser = {
-    id: crypto.randomUUID(),
-    name,
-    email,
-    passwordHash,
-    role: "OWNER",
-    createdAt: new Date().toISOString()
-  };
-
-  users.push(newUser);
-  saveUsers(users);
-
-  const token = generateToken(newUser);
-
-  return res.status(201).json({
-    message: "Conta criada com sucesso.",
-    token,
-    user: {
-      id: newUser.id,
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role
-    }
-  });
-});
-
-// Login
-app.post("/api/auth/login", async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({
-      message: "E-mail e senha são obrigatórios."
-    });
-  }
-
-  const users = readUsers();
-  const user = users.find((item) => item.email === email);
-
-  if (!user) {
-    return res.status(401).json({
-      message: "E-mail ou senha inválidos."
-    });
-  }
-
-  const passwordIsValid = await bcrypt.compare(password, user.passwordHash);
-
-  if (!passwordIsValid) {
-    return res.status(401).json({
-      message: "E-mail ou senha inválidos."
-    });
-  }
-
-  const token = generateToken(user);
-
-  return res.json({
-    message: "Login realizado com sucesso.",
-    token,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role
-    }
-  });
-});
-
-// Validar sessão JWT
-app.get("/api/auth/me", authMiddleware, (req, res) => {
-  return res.json({
-    message: "Sessão válida.",
-    user: req.user
-  });
-});
-
-// Recuperação de senha simulada
-app.post("/api/auth/forgot-password", (req, res) => {
-  const { email } = req.body;
-
-  if (!email) {
-    return res.status(400).json({
-      message: "Informe seu e-mail."
-    });
-  }
-
-  const users = readUsers();
-  const user = users.find((item) => item.email === email);
-
-  if (!user) {
-    return res.status(404).json({
-      message: "E-mail não encontrado."
-    });
-  }
-
-  const resetToken = jwt.sign(
-    {
-      id: user.id,
-      email: user.email,
-      type: "password_reset"
-    },
-    getJwtSecret(),
-    {
-      expiresIn: "15m"
-    }
-  );
-
-  console.log("Link de recuperação:");
-  console.log(`http://localhost:${PORT}/resetar.html?token=${resetToken}`);
-
-  return res.json({
-    message: "Link de recuperação gerado. Verifique o terminal do servidor.",
-    resetToken
-  });
-});
-
-// Resetar senha
-app.post("/api/auth/reset-password", async (req, res) => {
-  const { token, newPassword } = req.body;
-
-  if (!token || !newPassword) {
-    return res.status(400).json({
-      message: "Token e nova senha são obrigatórios."
-    });
-  }
-
-  if (newPassword.length < 6) {
-    return res.status(400).json({
-      message: "A nova senha precisa ter pelo menos 6 caracteres."
-    });
-  }
-
   try {
-    const decoded = jwt.verify(token, getJwtSecret());
+    const { name, email, password } = req.body;
 
-    if (decoded.type !== "password_reset") {
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Nome, email e senha são obrigatórios.",
+      });
+    }
+
+    const userExists = users.find((user) => user.email === email);
+
+    if (userExists) {
+      return res.status(409).json({
+        success: false,
+        message: "Este email já está cadastrado.",
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const newUser = {
+      id: users.length + 1,
+      name,
+      email,
+      passwordHash,
+    };
+
+    users.push(newUser);
+
+    return res.status(201).json({
+      success: true,
+      message: "Usuário criado com sucesso.",
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+      },
+    });
+  } catch (error) {
+    console.error("Erro no cadastro:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Erro interno ao cadastrar usuário.",
+    });
+  }
+});
+
+// Rota de login
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    console.log("Tentativa de login:", email);
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email e senha são obrigatórios.",
+      });
+    }
+
+    const user = users.find((user) => user.email === email);
+
+    if (!user) {
       return res.status(401).json({
-        message: "Token inválido para recuperação de senha."
+        success: false,
+        message: "Email ou senha incorretos.",
       });
     }
 
-    const users = readUsers();
-    const userIndex = users.findIndex((user) => user.id === decoded.id);
+    const passwordIsValid = await bcrypt.compare(password, user.passwordHash);
 
-    if (userIndex === -1) {
-      return res.status(404).json({
-        message: "Usuário não encontrado."
+    if (!passwordIsValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Email ou senha incorretos.",
       });
     }
 
-    users[userIndex].passwordHash = await bcrypt.hash(newPassword, 12);
-    users[userIndex].updatedAt = new Date().toISOString();
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+      JWT_SECRET,
+      {
+        expiresIn: "1h",
+      }
+    );
 
-    saveUsers(users);
+    return res.status(200).json({
+      success: true,
+      message: "Login realizado com sucesso.",
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error("Erro no login:", error);
 
-    return res.json({
-      message: "Senha alterada com sucesso."
+    return res.status(500).json({
+      success: false,
+      message: "Erro interno no servidor ao fazer login.",
+    });
+  }
+});
+
+// Rota protegida para testar dashboard
+app.get("/api/dashboard", (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      return res.status(401).json({
+        success: false,
+        message: "Token não enviado.",
+      });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Token inválido.",
+      });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    return res.status(200).json({
+      success: true,
+      message: "Acesso autorizado ao dashboard.",
+      user: decoded,
+      dashboard: {
+        receitaTotal: 12500,
+        despesasTotais: 6700,
+        lucroLiquido: 5800,
+        scoreFinanceiro: 87,
+      },
     });
   } catch (error) {
     return res.status(401).json({
-      message: "Token expirado ou inválido."
+      success: false,
+      message: "Token expirado ou inválido.",
     });
   }
 });
 
-// Rota protegida de exemplo
-app.get("/api/dashboard", authMiddleware, (req, res) => {
-  return res.json({
-    message: "Bem-vindo ao dashboard NexFinance.",
-    user: req.user,
-    data: {
-      receita: 125430,
-      despesas: 78250,
-      lucro: 47180,
-      scoreFinanceiro: 85
-    }
+// Abrir dashboard HTML
+app.get("/dashboard", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "dashboard.html"));
+});
+
+// Abrir login HTML
+app.get("/login", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "login.html"));
+});
+
+// Rota fallback para evitar HTML em API
+app.use("/api", (req, res) => {
+  return res.status(404).json({
+    success: false,
+    message: "Rota de API não encontrada.",
   });
 });
 
+// Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`Servidor rodando em http://localhost:${PORT}`);
+  console.log(`Servidor NexFinance rodando em http://localhost:${PORT}`);
+  console.log("Usuário teste:");
+  console.log("Email: teste@nexfinance.com");
+  console.log("Senha: 123456");
 });
