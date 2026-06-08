@@ -1,11 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("login.js carregado com sucesso");
-
   const loginForm = document.querySelector("#loginForm");
   const emailInput = document.querySelector("#username");
   const passwordInput = document.querySelector("#password");
   const messageBox = document.querySelector("#loginMessage");
   const submitButton = loginForm?.querySelector("button[type='submit']");
+  const googleButton = document.querySelector(".btn-google");
 
   if (!loginForm) {
     console.error("Formulário #loginForm não encontrado.");
@@ -25,7 +24,27 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    setLoading(true);
+    loginWithCredentials(email, password, {
+      button: submitButton,
+      loadingText: "Entrando...",
+      defaultText: "Entrar",
+    });
+  });
+
+  googleButton?.addEventListener("click", () => {
+    clearMessage();
+    showMessage("Entrando com acesso rápido de demonstração...", "success");
+
+    loginWithCredentials("teste@nexfinance.com", "123456", {
+      button: googleButton,
+      loadingText: "Conectando...",
+      defaultText: "Continuar com Google",
+    });
+  });
+
+  async function loginWithCredentials(email, password, options = {}) {
+    const { button, loadingText, defaultText } = options;
+    setLoading(button, true, loadingText);
 
     try {
       const response = await fetch("/api/auth/login", {
@@ -68,9 +87,9 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Erro ao fazer login:", error);
       showMessage("Não foi possível conectar ao servidor.", "error");
     } finally {
-      setLoading(false);
+      setLoading(button, false, defaultText);
     }
-  });
+  }
 
   function getInvestorProfileKey(user) {
     const identifier = user?.id || user?.email || "guest";
@@ -89,7 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
         <img src="img/LOGO-NEX.png.png" alt="NexFinance" class="transition-logo">
         <strong>${hasInvestorProfile ? "Abrindo seu dashboard" : "Preparando sua análise inicial"}</strong>
-        <p>${hasInvestorProfile ? "A IA está organizando seus indicadores." : "Antes do dashboard, vamos personalizar sua IA."}</p>
+        <p>${hasInvestorProfile ? "Organizando seus indicadores." : "Antes do dashboard, vamos personalizar sua experiência."}</p>
         <div class="transition-progress" aria-hidden="true"><i></i></div>
       </div>
     `;
@@ -140,9 +159,11 @@ document.addEventListener("DOMContentLoaded", () => {
     messageBox.style.display = "none";
   }
 
-  function setLoading(isLoading) {
-    if (!submitButton) return;
-    submitButton.disabled = isLoading;
-    submitButton.textContent = isLoading ? "Entrando..." : "Entrar";
+  function setLoading(button, isLoading, text) {
+    if (!button) return;
+    button.disabled = isLoading;
+    if (text) {
+      button.textContent = text;
+    }
   }
 });
