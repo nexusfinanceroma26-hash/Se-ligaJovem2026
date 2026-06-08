@@ -63,7 +63,7 @@ prisma/dev.db-journal
 *.key
 *.crt
 
-# Backup
+ # Backup
 *.bak
 *.backup
 # Variáveis de ambiente

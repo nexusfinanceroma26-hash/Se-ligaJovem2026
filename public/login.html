@@ -4,16 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Entrar | NexFinance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="login.css">
 </head>
 <body>
-  <main class="login-container">
+  <main class="login-container login-light">
     <section class="login-box">
-      <a class="brand" href="index.html">
+      <a class="brand" href="index.html" aria-label="NexFinance">
         <img class="brand-logo" src="img/LOGO-NEX.png.png" alt="NexFinance - Seu Sucesso, Nossa Inteligência">
       </a>
 
-      <h1>Bem-vindo de volta</h1>
+      <span class="login-eyebrow">Acesso seguro</span>
+      <h1>Bem-vindo de volta!</h1>
       <p>Acesse sua conta e continue gerenciando seu negócio com inteligência.</p>
 
       <form id="loginForm">
@@ -26,9 +30,17 @@
         <a href="esqueci.html" class="forgot">Esqueci minha senha</a>
 
         <button type="submit" class="btn-primary">Entrar</button>
-        <button type="button" class="btn-secondary" onclick="window.location.href='cadastro.html'">Criar conta</button>
+
+        <div class="login-divider"><span>ou continue com</span></div>
+
+        <button type="button" class="btn-google" aria-label="Continuar com Google">
+          <span class="google-mark">G</span>
+          Continuar com Google
+        </button>
 
         <div id="loginMessage" class="message" aria-live="polite"></div>
+
+        <p class="signup-text">Não tem uma conta? <a href="cadastro.html">Criar conta</a></p>
 
         <div class="terms">
           Ao acessar, você concorda com os Termos de Serviço e a Política de Privacidade da NexFinance.
@@ -39,7 +51,37 @@
     </section>
 
     <section class="mascot-panel" aria-label="Mascote NexFinance">
-      <img src="img/Mascote-png.png" alt="Nexy, mascote financeiro da NexFinance">
+      <div class="mascot-card light-mascot-card">
+        <div class="mascot-ring" aria-hidden="true"></div>
+        <div class="finance-card finance-card-revenue">
+          <span>Receita</span>
+          <strong>R$ 128.540,00</strong>
+          <small>▲ 18,6% vs mês anterior</small>
+          <div class="sparkline sparkline-up" aria-hidden="true"></div>
+        </div>
+
+        <div class="finance-card finance-card-expense">
+          <span>Despesa</span>
+          <strong>R$ 67.230,00</strong>
+          <small>▼ 9,4% vs mês anterior</small>
+          <div class="sparkline sparkline-down" aria-hidden="true"></div>
+        </div>
+
+        <div class="finance-card finance-card-score">
+          <span>Score Financeiro</span>
+          <strong>842</strong>
+          <small>Excelente</small>
+        </div>
+
+        <div class="finance-card finance-card-cash">
+          <span>Fluxo de Caixa</span>
+          <strong>R$ 61.310,00</strong>
+          <div class="cash-bars" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i>
+          </div>
+        </div>
+        <img class="mascot-image" src="img/Mascote-png.png" alt="Nexy, mascote financeiro da NexFinance">
+      </div>
     </section>
   </main>
 

@@ -15,8 +15,6 @@ document.addEventListener("DOMContentLoaded", () => {
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    console.log("Formulário interceptado pelo login.js");
-
     const email = emailInput.value.trim();
     const password = passwordInput.value.trim();
 
@@ -33,12 +31,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           email,
-          password
-        })
+          password,
+        }),
       });
 
       const contentType = response.headers.get("content-type");
@@ -60,12 +58,12 @@ document.addEventListener("DOMContentLoaded", () => {
       localStorage.setItem("nexfinance_token", data.token);
       localStorage.setItem("nexfinance_user", JSON.stringify(data.user));
 
+      const profileKey = getInvestorProfileKey(data.user);
+      const hasInvestorProfile = Boolean(localStorage.getItem(profileKey));
+      const nextPage = hasInvestorProfile ? "/dashboard" : "/perfil-investidor.html";
+
       showMessage("Login realizado com sucesso. Redirecionando...", "success");
-
-      setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 700);
-
+      startLoginTransition(nextPage, hasInvestorProfile);
     } catch (error) {
       console.error("Erro ao fazer login:", error);
       showMessage("Não foi possível conectar ao servidor.", "error");
@@ -73,6 +71,44 @@ document.addEventListener("DOMContentLoaded", () => {
       setLoading(false);
     }
   });
+
+  function getInvestorProfileKey(user) {
+    const identifier = user?.id || user?.email || "guest";
+    return `nexfinance_investor_profile_${identifier}`;
+  }
+
+  function startLoginTransition(nextPage, hasInvestorProfile) {
+    const overlay = document.createElement("div");
+    overlay.className = "login-transition";
+    overlay.innerHTML = `
+      <div class="transition-card" role="status" aria-live="polite">
+        <div class="transition-orbit" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <img src="img/LOGO-NEX.png.png" alt="NexFinance" class="transition-logo">
+        <strong>${hasInvestorProfile ? "Abrindo seu dashboard" : "Preparando sua análise inicial"}</strong>
+        <p>${hasInvestorProfile ? "A IA está organizando seus indicadores." : "Antes do dashboard, vamos personalizar sua IA."}</p>
+        <div class="transition-progress" aria-hidden="true"><i></i></div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.classList.add("is-transitioning");
+
+    requestAnimationFrame(() => {
+      overlay.classList.add("is-active");
+    });
+
+    setTimeout(() => {
+      overlay.classList.add("is-leaving");
+    }, 1350);
+
+    setTimeout(() => {
+      window.location.href = nextPage;
+    }, 1750);
+  }
 
   function showMessage(message, type) {
     if (!messageBox) {
