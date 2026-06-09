@@ -13,7 +13,7 @@
 
 .profile-badge {
   display: inline-flex;
-  margin-top: 36px;
+  margin-top: 34px;
   padding: 8px 12px;
   border-radius: 999px;
   background: var(--soft);
@@ -24,9 +24,9 @@
 
 .profile-intro h1 {
   margin-top: 18px;
-  font-size: clamp(36px, 5vw, 62px);
-  line-height: 1;
-  letter-spacing: -0.04em;
+  font-size: clamp(36px, 5vw, 60px);
+  line-height: 1.04;
+  letter-spacing: 0;
 }
 
 .profile-intro p {
@@ -63,11 +63,22 @@
 }
 
 .profile-card {
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(216, 224, 234, 0.92);
   border-radius: 24px;
   box-shadow: var(--shadow);
   padding: 34px;
+}
+
+.profile-card form {
+  display: grid;
+  gap: 14px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .form-header {
@@ -95,7 +106,20 @@ select {
   outline: none;
 }
 
-select:focus {
+.profile-card input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 15px;
+  outline: none;
+}
+
+select:focus,
+.profile-card input:focus {
   border-color: var(--teal);
   box-shadow: 0 0 0 4px rgba(0, 159, 145, 0.10);
 }
@@ -159,5 +183,58 @@ select:focus {
 
   .profile-card {
     padding: 24px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 981px) and (max-width: 1280px) {
+  .profile-shell {
+    grid-template-columns: minmax(320px, 0.82fr) minmax(420px, 1.18fr);
+    gap: 28px;
+    padding-inline: 4vw;
+  }
+
+  .profile-intro h1 {
+    font-size: clamp(38px, 4.4vw, 52px);
+  }
+
+  .profile-card {
+    padding: 28px;
+  }
+}
+
+@media (max-width: 620px) {
+  .profile-shell {
+    min-height: 100dvh;
+    padding: calc(18px + env(safe-area-inset-top)) 14px calc(22px + env(safe-area-inset-bottom));
+  }
+
+  .profile-intro h1 {
+    font-size: clamp(32px, 10vw, 42px);
+  }
+
+  .profile-intro p {
+    font-size: 15px;
+  }
+
+  .profile-benefits {
+    display: none;
+  }
+
+  .profile-card {
+    padding: 22px 18px;
+    border-radius: 22px;
+  }
+
+  .form-header h2 {
+    font-size: 24px;
+  }
+
+  select,
+  .profile-card input {
+    min-height: 50px;
   }
 }

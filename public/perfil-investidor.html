@@ -2,8 +2,15 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Análise de Perfil | NexFinance</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#061b2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="NexFinance">
+  <link rel="icon" type="image/png" href="img/LOGO-NEX.png.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="img/LOGO-NEX.png.png">
+  <title>Perfil do Negócio | NexFinance</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -13,28 +20,26 @@
 <body>
   <main class="profile-shell">
     <section class="profile-intro">
-      <a class="brand" href="index.html">
+      <a class="brand" href="login.html" aria-label="NexFinance">
         <img class="brand-logo" src="img/LOGO-NEX.png.png" alt="NexFinance - Seu Sucesso, Nossa Inteligência">
       </a>
 
       <span class="profile-badge">Primeiro acesso</span>
-      <h1>Análise de perfil do investidor</h1>
-      <p>
-        Responda algumas perguntas rápidas para a IA entender seu estilo financeiro e entregar dicas mais úteis para sua empresa.
-      </p>
+      <h1>Perfil do negócio</h1>
+      <p>Conte um pouco sobre sua empresa para a IA adaptar alertas, recomendações e relatórios ao seu tipo de operação.</p>
 
       <div class="profile-benefits">
         <div>
-          <strong>Recomendações melhores</strong>
-          <span>A IA ajusta alertas, sugestões e prioridades.</span>
+          <strong>Serve para vários perfis</strong>
+          <span>MEI, microempreendedores, comerciantes, prestadores de serviço e investidores.</span>
         </div>
         <div>
-          <strong>Mais segurança</strong>
-          <span>As dicas respeitam seu nível de risco.</span>
+          <strong>Recomendações mais úteis</strong>
+          <span>A IA entende o porte, setor, rotina financeira e nível de risco do negócio.</span>
         </div>
         <div>
-          <strong>Auxílio personalizado</strong>
-          <span>O assistente entende seus objetivos e horizonte.</span>
+          <strong>Decisões práticas</strong>
+          <span>O dashboard prioriza caixa, estoque, vendas, fornecedores ou crescimento conforme sua realidade.</span>
         </div>
       </div>
     </section>
@@ -42,21 +47,55 @@
     <section class="profile-card">
       <form id="investorProfileForm">
         <div class="form-header">
-          <h2>Configurar IA financeira</h2>
-          <p>Isso será pedido apenas no primeiro login.</p>
+          <h2>Configurar IA da NexFinance</h2>
+          <p>Isso será pedido apenas no primeiro acesso.</p>
+        </div>
+
+        <div class="form-row">
+          <div>
+            <label for="businessType">Tipo de perfil</label>
+            <select id="businessType" name="businessType" required>
+              <option value="">Selecione</option>
+              <option value="mei">MEI</option>
+              <option value="microempreendedor">Microempreendedor</option>
+              <option value="comerciante">Comerciante</option>
+              <option value="prestador-servico">Prestador de serviço</option>
+              <option value="microempresa">Microempresa</option>
+              <option value="investidor">Investidor</option>
+              <option value="outro">Outro perfil</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="segment">Segmento principal</label>
+            <select id="segment" name="segment" required>
+              <option value="">Selecione</option>
+              <option value="alimentacao">Alimentação</option>
+              <option value="varejo">Varejo</option>
+              <option value="servicos">Serviços</option>
+              <option value="beleza">Beleza e estética</option>
+              <option value="tecnologia">Tecnologia</option>
+              <option value="moda">Moda e acessórios</option>
+              <option value="educacao">Educação</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
         </div>
 
         <label for="goal">Principal objetivo</label>
         <select id="goal" name="goal" required>
           <option value="">Selecione</option>
-          <option value="proteger-caixa">Proteger o caixa da empresa</option>
+          <option value="organizar">Organizar finanças e operação</option>
+          <option value="proteger-caixa">Proteger o caixa</option>
+          <option value="vender-mais">Vender mais</option>
+          <option value="controlar-estoque">Controlar estoque</option>
+          <option value="reduzir-custos">Reduzir custos</option>
           <option value="crescer">Crescer com controle</option>
-          <option value="expandir">Expandir de forma agressiva</option>
-          <option value="organizar">Organizar finanças e reduzir riscos</option>
+          <option value="captar-investimento">Captar investimento</option>
         </select>
 
-        <label>Perfil de risco</label>
-        <div class="risk-grid" role="radiogroup" aria-label="Perfil de risco">
+        <label>Perfil de decisão</label>
+        <div class="risk-grid" role="radiogroup" aria-label="Perfil de decisão">
           <label class="risk-option">
             <input type="radio" name="risk" value="conservador" required>
             <span>
@@ -82,7 +121,7 @@
 
         <div class="form-row">
           <div>
-            <label for="experience">Experiência financeira</label>
+            <label for="experience">Experiência com gestão financeira</label>
             <select id="experience" name="experience" required>
               <option value="">Selecione</option>
               <option value="iniciante">Iniciante</option>
@@ -92,20 +131,22 @@
           </div>
 
           <div>
-            <label for="horizon">Horizonte de decisão</label>
-            <select id="horizon" name="horizon" required>
+            <label for="businessStage">Momento do negócio</label>
+            <select id="businessStage" name="businessStage" required>
               <option value="">Selecione</option>
-              <option value="curto">Até 6 meses</option>
-              <option value="medio">6 a 18 meses</option>
-              <option value="longo">Mais de 18 meses</option>
+              <option value="comecando">Começando agora</option>
+              <option value="validando">Validando vendas</option>
+              <option value="estavel">Operação estável</option>
+              <option value="crescimento">Em crescimento</option>
+              <option value="reestruturando">Reorganizando a empresa</option>
             </select>
           </div>
         </div>
 
         <div class="form-row">
           <div>
-            <label for="monthlyInvestment">Valor mensal para investir</label>
-            <input type="number" id="monthlyInvestment" name="monthlyInvestment" min="0" placeholder="Ex: 5000" required>
+            <label for="monthlyRevenue">Faturamento mensal aproximado</label>
+            <input type="number" id="monthlyRevenue" name="monthlyRevenue" min="0" placeholder="Ex: 12000" required>
           </div>
 
           <div>
@@ -119,12 +160,38 @@
           </div>
         </div>
 
+        <div class="form-row">
+          <div>
+            <label for="teamSize">Tamanho da equipe</label>
+            <select id="teamSize" name="teamSize" required>
+              <option value="">Selecione</option>
+              <option value="solo">Só eu</option>
+              <option value="2-5">2 a 5 pessoas</option>
+              <option value="6-15">6 a 15 pessoas</option>
+              <option value="16+">Mais de 15 pessoas</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="mainChallenge">Maior desafio hoje</label>
+            <select id="mainChallenge" name="mainChallenge" required>
+              <option value="">Selecione</option>
+              <option value="caixa">Fluxo de caixa</option>
+              <option value="estoque">Estoque</option>
+              <option value="vendas">Vendas</option>
+              <option value="custos">Custos e fornecedores</option>
+              <option value="clientes">Clientes e recorrência</option>
+              <option value="organizacao">Organização geral</option>
+            </select>
+          </div>
+        </div>
+
         <label for="aiStyle">Como você quer que a IA te ajude?</label>
         <select id="aiStyle" name="aiStyle" required>
           <option value="">Selecione</option>
           <option value="cuidadosa">Com alertas cuidadosos antes de riscos</option>
           <option value="equilibrada">Com recomendações equilibradas e objetivas</option>
-          <option value="agressiva">Com oportunidades de crescimento e expansão</option>
+          <option value="crescimento">Com foco em crescimento e oportunidades</option>
         </select>
 
         <div id="profileMessage" class="message" aria-live="polite"></div>
@@ -134,6 +201,7 @@
     </section>
   </main>
 
+  <script src="pwa.js"></script>
   <script src="perfil-investidor.js"></script>
 </body>
 </html>

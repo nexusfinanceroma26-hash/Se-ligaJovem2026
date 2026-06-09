@@ -2,38 +2,61 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#061b2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="NexFinance">
   <title>Recuperar senha | NexFinance</title>
+  <link rel="icon" type="image/png" href="img/LOGO-NEX.png.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="img/LOGO-NEX.png.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="login.css">
 </head>
 <body>
-  <main class="login-container">
+  <main class="login-container login-light">
     <section class="login-box">
-      <a class="brand" href="index.html">
+      <a class="brand" href="login.html" aria-label="NexFinance">
         <img class="brand-logo" src="img/LOGO-NEX.png.png" alt="NexFinance - Seu Sucesso, Nossa Inteligência">
       </a>
 
+      <span class="login-eyebrow">Segurança</span>
       <h1>Recuperar senha</h1>
-      <p>Informe seu e-mail para gerar um link de recuperação no terminal do servidor.</p>
+      <p>Informe seu e-mail para receber as instruções de recuperação da conta.</p>
 
       <form id="recoverForm">
         <label for="email">E-mail</label>
-        <input type="email" id="email" placeholder="seu@email.com" required>
+        <input type="email" id="email" placeholder="seu@email.com" autocomplete="email" required>
 
-        <button type="submit" class="btn-primary">Enviar link</button>
+        <button type="submit" class="btn-primary">Enviar instruções</button>
         <div id="recoverMessage" class="message" aria-live="polite"></div>
       </form>
 
       <a href="login.html" class="back-link">Voltar para o login</a>
     </section>
 
-    <section class="info-panel">
-      <span class="badge">Segurança</span>
-      <h2>Recuperação com token temporário.</h2>
-      <p>O servidor gera um token de redefinição com validade curta, simulando o fluxo seguro de recuperação de senha.</p>
+    <section class="mascot-panel" aria-label="Resumo de segurança">
+      <div class="mascot-card light-mascot-card">
+        <div class="mascot-ring" aria-hidden="true"></div>
+        <div class="finance-card finance-card-revenue">
+          <span>Conta protegida</span>
+          <strong>Token temporário</strong>
+          <small>Validade curta para reduzir riscos</small>
+        </div>
+        <div class="finance-card finance-card-score">
+          <span>Segurança</span>
+          <strong>Alta</strong>
+          <small>Fluxo verificado</small>
+        </div>
+        <img class="mascot-image" src="img/Mascote-png.png" alt="Nexy, mascote financeiro da NexFinance">
+      </div>
     </section>
   </main>
 
+  <script src="pwa.js"></script>
   <script src="recuperar.js"></script>
 </body>
 </html>

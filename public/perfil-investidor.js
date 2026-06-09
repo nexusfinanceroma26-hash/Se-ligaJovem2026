@@ -5,8 +5,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const messageBox = document.querySelector("#profileMessage");
 
   if (!token) {
-    window.location.href = "login.html";
-    return;
+    localStorage.setItem("nexfinance_token", "demo-presentation-token");
+    localStorage.setItem("nexfinance_user", JSON.stringify({ id: "demo", name: "Usuário Teste", email: "demo@nexfinance.com" }));
   }
 
   if (!form) return;
@@ -16,39 +16,49 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const formData = new FormData(form);
     const profile = {
+      businessType: formData.get("businessType"),
+      segment: formData.get("segment"),
       goal: formData.get("goal"),
       risk: formData.get("risk"),
       experience: formData.get("experience"),
-      horizon: formData.get("horizon"),
-      monthlyInvestment: Number(formData.get("monthlyInvestment")) || 0,
+      businessStage: formData.get("businessStage"),
+      monthlyRevenue: Number(formData.get("monthlyRevenue")) || 0,
       cashReserve: formData.get("cashReserve"),
+      teamSize: formData.get("teamSize"),
+      mainChallenge: formData.get("mainChallenge"),
       aiStyle: formData.get("aiStyle"),
       completedAt: new Date().toISOString(),
     };
 
     if (!isComplete(profile)) {
-      showMessage("Preencha todos os campos para a IA montar seu perfil.", "error");
+      showMessage("Preencha todos os campos para a IA montar o perfil do negócio.", "error");
       return;
     }
 
-    const result = calculateInvestorProfile(profile);
+    const result = calculateBusinessProfile(profile);
     const finalProfile = {
       ...profile,
       type: result.type,
       score: result.score,
       recommendation: result.recommendation,
       aiTone: result.aiTone,
+      priorityFocus: result.priorityFocus,
     };
 
-    const profileKey = getInvestorProfileKey(user);
+    const profileKey = getBusinessProfileKey(user);
     localStorage.setItem(profileKey, JSON.stringify(finalProfile));
+    localStorage.setItem("nexfinance_business_profile", JSON.stringify(finalProfile));
+
+    // Compatibilidade com o fluxo antigo do login.
     localStorage.setItem("nexfinance_investor_profile", JSON.stringify(finalProfile));
 
     localStorage.setItem(
       "nexfinance_user",
       JSON.stringify({
         ...user,
+        businessProfileCompleted: true,
         investorProfileCompleted: true,
+        businessProfileType: finalProfile.type,
         investorProfileType: finalProfile.type,
       }),
     );
@@ -68,66 +78,88 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function getInvestorProfileKey(currentUser) {
+  function getBusinessProfileKey(currentUser) {
     const identifier = currentUser?.id || currentUser?.email || "guest";
     return `nexfinance_investor_profile_${identifier}`;
   }
 
   function isComplete(profile) {
     return Boolean(
+      profile.businessType &&
+      profile.segment &&
       profile.goal &&
       profile.risk &&
       profile.experience &&
-      profile.horizon &&
-      profile.monthlyInvestment >= 0 &&
+      profile.businessStage &&
+      profile.monthlyRevenue >= 0 &&
       profile.cashReserve &&
+      profile.teamSize &&
+      profile.mainChallenge &&
       profile.aiStyle,
     );
   }
 
-  function calculateInvestorProfile(profile) {
+  function calculateBusinessProfile(profile) {
     let score = 0;
 
     if (profile.risk === "conservador") score += 1;
     if (profile.risk === "moderado") score += 2;
     if (profile.risk === "arrojado") score += 3;
 
-    if (profile.horizon === "curto") score += 1;
-    if (profile.horizon === "medio") score += 2;
-    if (profile.horizon === "longo") score += 3;
-
     if (profile.cashReserve === "baixa") score += 1;
     if (profile.cashReserve === "media") score += 2;
     if (profile.cashReserve === "alta") score += 3;
 
-    if (profile.goal === "proteger-caixa" || profile.goal === "organizar") score += 1;
-    if (profile.goal === "crescer") score += 2;
-    if (profile.goal === "expandir") score += 3;
+    if (profile.businessStage === "comecando" || profile.businessStage === "validando") score += 1;
+    if (profile.businessStage === "estavel" || profile.businessStage === "reestruturando") score += 2;
+    if (profile.businessStage === "crescimento") score += 3;
+
+    if (profile.goal === "organizar" || profile.goal === "proteger-caixa") score += 1;
+    if (profile.goal === "vender-mais" || profile.goal === "controlar-estoque" || profile.goal === "reduzir-custos") score += 2;
+    if (profile.goal === "crescer" || profile.goal === "captar-investimento") score += 3;
+
+    const priorityFocus = getPriorityFocus(profile);
 
     if (score <= 6) {
       return {
         score,
-        type: "Conservador",
+        type: "Operação em organização",
         aiTone: "cuidadosa",
-        recommendation: "Priorizar caixa, previsibilidade, redução de riscos e decisões com margem de segurança.",
+        priorityFocus,
+        recommendation: "Priorizar organização financeira, controle de caixa e rotina simples de acompanhamento semanal.",
       };
     }
 
     if (score <= 9) {
       return {
         score,
-        type: "Moderado",
+        type: "Negócio em controle",
         aiTone: "equilibrada",
-        recommendation: "Equilibrar crescimento com controle de caixa, margem e exposição financeira.",
+        priorityFocus,
+        recommendation: "Equilibrar crescimento com margem, estoque, fornecedores e previsibilidade de caixa.",
       };
     }
 
     return {
       score,
-      type: "Arrojado",
+      type: "Negócio em crescimento",
       aiTone: "expansiva",
-      recommendation: "Buscar expansão, novas oportunidades e maior retorno, mantendo alertas de risco bem visíveis.",
+      priorityFocus,
+      recommendation: "Buscar crescimento com metas, análise de canais, controle de risco e decisões orientadas por dados.",
     };
+  }
+
+  function getPriorityFocus(profile) {
+    const map = {
+      caixa: "Fluxo de caixa",
+      estoque: "Estoque e compras",
+      vendas: "Vendas e canais",
+      custos: "Custos e fornecedores",
+      clientes: "Clientes e recorrência",
+      organizacao: "Organização geral",
+    };
+
+    return map[profile.mainChallenge] || "Gestão do negócio";
   }
 
   function showMessage(message, type) {

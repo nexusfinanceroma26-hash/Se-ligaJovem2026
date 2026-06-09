@@ -39,11 +39,12 @@ document.addEventListener("DOMContentLoaded", () => {
       button: googleButton,
       loadingText: "Conectando...",
       defaultText: "Continuar com Google",
+      allowDemoFallback: true,
     });
   });
 
   async function loginWithCredentials(email, password, options = {}) {
-    const { button, loadingText, defaultText } = options;
+    const { button, loadingText, defaultText, allowDemoFallback = false } = options;
     setLoading(button, true, loadingText);
 
     try {
@@ -63,7 +64,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!contentType || !contentType.includes("application/json")) {
         const text = await response.text();
         console.error("Resposta não JSON:", text);
-        showMessage("Erro: o servidor não retornou JSON.", "error");
+        if (allowDemoFallback) {
+          startDemoSession("Acesso de demonstração iniciado.");
+        } else {
+          showMessage("Erro: o servidor não retornou JSON.", "error");
+        }
         return;
       }
 
@@ -85,10 +90,32 @@ document.addEventListener("DOMContentLoaded", () => {
       startLoginTransition(nextPage, hasInvestorProfile);
     } catch (error) {
       console.error("Erro ao fazer login:", error);
-      showMessage("Não foi possível conectar ao servidor.", "error");
+      if (allowDemoFallback || isDemoCredential(email, password)) {
+        startDemoSession("Servidor indisponível. Entrando em modo apresentação.");
+      } else {
+        showMessage("Não foi possível conectar ao servidor.", "error");
+      }
     } finally {
       setLoading(button, false, defaultText);
     }
+  }
+
+  function isDemoCredential(email, password) {
+    return email.toLowerCase() === "teste@nexfinance.com" && password === "123456";
+  }
+
+  function startDemoSession(message) {
+    const demoUser = {
+      id: "demo",
+      name: "Usuário Teste",
+      email: "teste@nexfinance.com",
+    };
+
+    localStorage.setItem("nexfinance_token", "demo-presentation-token");
+    localStorage.setItem("nexfinance_user", JSON.stringify(demoUser));
+    localStorage.setItem(getInvestorProfileKey(demoUser), JSON.stringify({ perfil: "Moderado" }));
+    showMessage(message, "success");
+    startLoginTransition("/dashboard", true);
   }
 
   function getInvestorProfileKey(user) {

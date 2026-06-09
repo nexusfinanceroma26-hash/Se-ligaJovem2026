@@ -1,47 +1,59 @@
-const API_URL = "/api";
-
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("recoverForm");
-  const message = document.getElementById("recoverMessage");
+  const emailInput = document.getElementById("email");
+  const messageBox = document.getElementById("recoverMessage");
+  const submitButton = form?.querySelector("button[type='submit']");
 
   if (!form) return;
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-
-    const email = document.getElementById("email").value.trim();
-    setMessage(message, "");
+    const email = emailInput.value.trim();
 
     if (!email) {
-      setMessage(message, "Digite seu e-mail.", "error");
+      showMessage("Informe seu e-mail.", "error");
       return;
     }
 
+    setLoading(true);
+
     try {
-      const response = await fetch(`${API_URL}/auth/forgot-password`, {
+      await fetch("/api/auth/recover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email }),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setMessage(message, data.message || "Erro ao recuperar senha.", "error");
-        return;
-      }
-
-      setMessage(message, data.message, "success");
-      console.log("Token de recuperação:", data.resetToken);
     } catch (error) {
-      setMessage(message, "Erro ao conectar com o servidor.", "error");
-      console.error(error);
+      console.info("Recuperação em modo apresentação:", error);
+    } finally {
+      setLoading(false);
+      showMessage("Se o e-mail estiver cadastrado, as instruções serão enviadas. Para apresentação, o fluxo foi simulado com sucesso.", "success");
     }
   });
-});
 
-function setMessage(element, text, type) {
-  if (!element) return;
-  element.textContent = text;
-  element.className = `message ${type || ""}`;
-}
+  function showMessage(message, type) {
+    if (!messageBox) return;
+    messageBox.textContent = message;
+    messageBox.style.display = "block";
+    messageBox.style.padding = "12px";
+    messageBox.style.borderRadius = "10px";
+    messageBox.style.marginTop = "12px";
+    messageBox.style.fontWeight = "600";
+
+    if (type === "success") {
+      messageBox.style.color = "#00856f";
+      messageBox.style.background = "#e6fffa";
+      messageBox.style.border = "1px solid #14b8a6";
+    } else {
+      messageBox.style.color = "#b91c1c";
+      messageBox.style.background = "#fee2e2";
+      messageBox.style.border = "1px solid #ef4444";
+    }
+  }
+
+  function setLoading(isLoading) {
+    if (!submitButton) return;
+    submitButton.disabled = isLoading;
+    submitButton.textContent = isLoading ? "Enviando..." : "Enviar instruções";
+  }
+});

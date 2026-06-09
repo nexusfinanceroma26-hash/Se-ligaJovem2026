@@ -10,12 +10,18 @@ document.addEventListener("DOMContentLoaded", () => {
     clearMessage();
 
     const name = document.getElementById("name").value.trim();
+    const company = document.getElementById("company").value.trim();
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value.trim();
     const confirmPassword = document.getElementById("confirmPassword").value.trim();
 
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name || !company || !email || !password || !confirmPassword) {
       showMessage("Preencha todos os campos.", "error");
+      return;
+    }
+
+    if (company.length < 3) {
+      showMessage("Informe o nome da empresa com pelo menos 3 caracteres.", "error");
       return;
     }
 
@@ -39,6 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         body: JSON.stringify({
           name,
+          company,
           email,
           password,
         }),
@@ -51,14 +58,35 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      showMessage("Conta criada com sucesso. Redirecionando para o login...", "success");
+      if (data.token) {
+        localStorage.setItem("nexfinance_token", data.token);
+      }
+
+      if (data.user) {
+        localStorage.setItem("nexfinance_user", JSON.stringify(data.user));
+      }
+
+      showMessage("Conta criada com sucesso. Preparando seu perfil...", "success");
 
       setTimeout(() => {
-        window.location.href = "login.html";
+        window.location.href = "perfil-investidor.html";
       }, 900);
     } catch (error) {
       console.error("Erro ao criar conta:", error);
-      showMessage("Não foi possível conectar ao servidor.", "error");
+      const demoUser = {
+        id: `demo-${Date.now()}`,
+        name,
+        email,
+        company,
+      };
+
+      localStorage.setItem("nexfinance_token", "demo-presentation-token");
+      localStorage.setItem("nexfinance_user", JSON.stringify(demoUser));
+      showMessage("Servidor indisponível. Conta criada em modo apresentação.", "success");
+
+      setTimeout(() => {
+        window.location.href = "perfil-investidor.html";
+      }, 900);
     } finally {
       setLoading(false);
     }
