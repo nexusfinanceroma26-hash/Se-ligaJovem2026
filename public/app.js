@@ -2,12 +2,16 @@ const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL
 
 function getInitialRoute() {
   const route = window.location.hash.replace("#", "").trim();
-  const allowed = [
+  const allowed = getAllowedRoutes();
+  return allowed.includes(route) ? route : "dashboard";
+}
+
+function getAllowedRoutes() {
+  return [
     "dashboard", "stock", "sales", "marketplace", "financial", "capital", "payroll",
     "assets", "investors", "assistant", "recommendations", "reports", "settings",
     "customers", "suppliers", "products"
   ];
-  return allowed.includes(route) ? route : "dashboard";
 }
 
 const state = {
@@ -742,12 +746,17 @@ async function sendAi(event) {
 }
 
 function go(route) {
+  if (!getAllowedRoutes().includes(route)) return;
   state.route = route;
   state.drawer = null;
-  if (window.location.hash.replace("#", "") !== route) {
-    window.history.replaceState(null, "", `#${route}`);
+  state.drawerRoute = null;
+  state.editingIndex = null;
+  document.getElementById("sidebar")?.classList.remove("open");
+  if (window.location.hash !== `#${route}`) {
+    window.history.pushState(null, "", `#${route}`);
   }
   render();
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function openDrawer(title, route = state.route) {
@@ -773,6 +782,19 @@ window.addEventListener("hashchange", () => {
   if (route !== state.route) {
     state.route = route;
     state.drawer = null;
+    state.drawerRoute = null;
+    state.editingIndex = null;
+    render();
+  }
+});
+
+window.addEventListener("popstate", () => {
+  const route = getInitialRoute();
+  if (route !== state.route) {
+    state.route = route;
+    state.drawer = null;
+    state.drawerRoute = null;
+    state.editingIndex = null;
     render();
   }
 });

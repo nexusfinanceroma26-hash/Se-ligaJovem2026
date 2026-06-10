@@ -1,4 +1,4 @@
-const CACHE_NAME = "nexfinance-pwa-v3";
+const CACHE_NAME = "nexfinance-pwa-v4";
 const APP_SHELL = [
   "/",
   "/login.html",
@@ -43,6 +43,19 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET" || url.pathname.startsWith("/api/")) {
     event.respondWith(fetch(request));
+    return;
+  }
+
+  if (["/app.js", "/styles.css", "/login.css", "/perfil-investidor.css", "/pwa.js", "/manifest.webmanifest"].includes(url.pathname)) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => caches.match(request)),
+    );
     return;
   }
 
