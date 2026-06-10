@@ -85,6 +85,17 @@ const seedRows = {
     ["Amazon", "#AM-5520", money.format(3190), "Concluído", "16,1% margem"],
     ["Shopify", "#SP-9011", money.format(860), "Separação", "21,2% margem"],
   ],
+  financial: [
+    ["08/06", "Venda Grupo Costa", "Receita", money.format(6190), "Pago"],
+    ["07/06", "Fornecedor Alpha", "Despesa", money.format(18400), "Pendente"],
+    ["06/06", "Folha parcial", "Despesa", money.format(12800), "Pago"],
+    ["05/06", "Marketplace Amazon", "Receita", money.format(3190), "Concluído"],
+  ],
+  capital: [
+    ["Antecipar 18% dos recebíveis", money.format(42100), "Médio", "7 dias"],
+    ["Renegociar prazo fornecedor Beta", money.format(18500), "Baixo", "14 dias"],
+    ["Reduzir estoque parado", money.format(23100), "Médio", "30 dias"],
+  ],
   payroll: [
     ["Marina Lopes", "Financeiro", money.format(5200), money.format(7358), "OK"],
     ["Igor Santos", "Operação", money.format(3600), money.format(5126), "Horas extras"],
@@ -180,6 +191,32 @@ const drawerSchemas = {
     statusOptions: ["Recebido", "Enviado", "Concluído", "Separação"],
     toRow: (data) => [data.channel, data.order || `#MK-${Date.now().toString().slice(-4)}`, normalizeValue(data.amount), data.status, data.performance || "14,2% margem"],
     fromRow: (row) => ({ channel: row[0], order: row[1], amount: row[2], status: row[3], performance: row[4] }),
+  },
+  financial: {
+    title: "lançamento financeiro",
+    fields: [
+      ["date", "Data", "Ex: 09/06"],
+      ["description", "Descrição", "Ex: Venda balcão"],
+      ["category", "Categoria", "Receita"],
+      ["amount", "Valor", "Ex: 1250"],
+      ["status", "Status", "Pago"],
+    ],
+    categoryOptions: ["Receita", "Despesa"],
+    statusOptions: ["Pago", "Pendente", "Concluído", "Atrasado"],
+    toRow: (data) => [data.date || currentShortDate(), data.description, data.category || "Receita", normalizeValue(data.amount), data.status || "Pendente"],
+    fromRow: (row) => ({ date: row[0], description: row[1], category: row[2], amount: row[3], status: row[4] }),
+  },
+  capital: {
+    title: "ação de capital de giro",
+    fields: [
+      ["action", "Ação sugerida", "Ex: Antecipar recebíveis"],
+      ["impact", "Impacto estimado", "Ex: 42100"],
+      ["risk", "Risco", "Médio"],
+      ["deadline", "Prazo", "Ex: 7 dias"],
+    ],
+    risks: ["Baixo", "Médio", "Alto", "Crítico"],
+    toRow: (data) => [data.action, normalizeValue(data.impact), data.risk || "Médio", data.deadline || "7 dias"],
+    fromRow: (row) => ({ action: row[0], impact: row[1], risk: row[2], deadline: row[3] }),
   },
   payroll: {
     title: "funcionário",
@@ -417,37 +454,38 @@ function dataPage(key) {
 }
 
 function financial() {
+  const receivable = rows.financial
+    .filter((row) => String(row[2]).toLowerCase().includes("receita") && !String(row[4]).toLowerCase().includes("pago"))
+    .reduce((total, row) => total + parseMoney(row[3]), 0);
+  const payable = rows.financial
+    .filter((row) => String(row[2]).toLowerCase().includes("despesa") && !String(row[4]).toLowerCase().includes("pago"))
+    .reduce((total, row) => total + parseMoney(row[3]), 0);
+  const cashForecast = sumRows(rows.sales, 2) + sumRows(rows.marketplace, 2) + receivable - payable;
+
   return el("div", { class: "grid" }, [
     head("Financeiro", "Fluxo de caixa, contas a pagar, contas a receber e conciliação.", [btn("Novo lançamento", "＋", true, () => openDrawer("Novo lançamento financeiro", "financial"))]),
     el("div", { class: "grid cols-4" }, [
-      metric({ label: "Contas a receber", value: money.format(132900), delta: "+9,8%", help: "Próximos 30 dias", progress: 70 }),
-      metric({ label: "Contas a pagar", value: money.format(84200), delta: "-2,4%", help: "Próximos 30 dias", progress: 49 }),
-      metric({ label: "Caixa previsto", value: money.format(184000), delta: "+6,1%", help: "Saldo projetado", progress: 76 }),
+      metric({ label: "Contas a receber", value: money.format(receivable), delta: "+9,8%", help: "Lançamentos pendentes de receita", progress: Math.min(92, Math.max(24, receivable / 1800)) }),
+      metric({ label: "Contas a pagar", value: money.format(payable), delta: payable ? "-2,4%" : "0%", help: "Despesas ainda pendentes", progress: Math.min(92, Math.max(20, payable / 1200)) }),
+      metric({ label: "Caixa previsto", value: money.format(cashForecast), delta: cashForecast >= 0 ? "+6,1%" : "-4,8%", help: "Saldo projetado com dados atuais", progress: cashForecast >= 0 ? 76 : 38 }),
       metric({ label: "Inadimplência", value: "3,4%", delta: "-0,7%", help: "Clientes vencidos", progress: 34 }),
     ]),
-    tablePanel("Lançamentos recentes", ["Data", "Descrição", "Categoria", "Valor", "Status"], [
-      ["08/06", "Venda Grupo Costa", "Receita", money.format(6190), "Pago"],
-      ["07/06", "Fornecedor Alpha", "Despesa", money.format(18400), "Pendente"],
-      ["06/06", "Folha parcial", "Despesa", money.format(12800), "Pago"],
-      ["05/06", "Marketplace Amazon", "Receita", money.format(3190), "Concluído"],
-    ]),
+    tablePanel("Lançamentos recentes", ["Data", "Descrição", "Categoria", "Valor", "Status"], rows.financial, "financial"),
   ]);
 }
 
 function capital() {
+  const gap = calculateWorkingCapitalGap();
+
   return el("div", { class: "grid" }, [
-    head("Capital de Giro", "Liquidez, ciclo financeiro, necessidade de caixa e simulações.", [btn("Simular crédito", "◇", true, () => openDrawer("Simulação de capital de giro"))]),
+    head("Capital de Giro", "Liquidez, ciclo financeiro, necessidade de caixa e simulações.", [btn("Nova ação", "◇", true, () => openDrawer("Ação de capital de giro", "capital"))]),
     el("div", { class: "grid cols-4" }, [
       metric({ label: "Liquidez corrente", value: "1,42", delta: "+0,08", help: "Ativo circulante / passivo", progress: 71 }),
       metric({ label: "Ciclo financeiro", value: "37 dias", delta: "-4 dias", help: "Estoque + recebimento - pagamento", progress: 63 }),
-      metric({ label: "Gap projetado", value: money.format(38400), delta: "D+21", help: "Necessidade estimada", progress: 48 }),
+      metric({ label: "Gap projetado", value: money.format(gap), delta: "D+21", help: "Necessidade estimada com dados atuais", progress: Math.min(84, Math.max(24, gap / 1000)) }),
       metric({ label: "Cobertura", value: "4,1x", delta: "Saudável", help: "EBIT / juros", progress: 82 }),
     ]),
-    tablePanel("Plano de ação", ["Ação sugerida", "Impacto", "Risco", "Prazo"], [
-      ["Antecipar 18% dos recebíveis", money.format(42100), "Médio", "7 dias"],
-      ["Renegociar prazo fornecedor Beta", money.format(18500), "Baixo", "14 dias"],
-      ["Reduzir estoque parado", money.format(23100), "Médio", "30 dias"],
-    ]),
+    tablePanel("Plano de ação", ["Ação sugerida", "Impacto", "Risco", "Prazo"], rows.capital, "capital"),
   ]);
 }
 
@@ -624,7 +662,13 @@ function field(label, type, value) {
 
 function schemaField(route, name, label, placeholder, value = "") {
   const schema = drawerSchemas[route];
-  const options = name === "risk" ? schema.risks : name === "status" ? schema.statusOptions : null;
+  const options = name === "risk"
+    ? schema.risks
+    : name === "status"
+      ? schema.statusOptions
+      : name === "category"
+        ? schema.categoryOptions
+        : null;
 
   if (options) {
     return el("div", { class: "field" }, [
@@ -823,6 +867,7 @@ function editRecord(route, index) {
 function deleteRecord(route, index) {
   const deleted = rows[route]?.[index];
   if (!deleted) return;
+  if (!window.confirm("Deseja excluir este registro?")) return;
 
   rows[route].splice(index, 1);
   saveDatabase();
@@ -833,9 +878,15 @@ function deleteRecord(route, index) {
 function getKpis() {
   const salesTotal = sumRows(rows.sales, 2) + sumRows(rows.marketplace, 2);
   const payrollTotal = sumRows(rows.payroll, 3);
+  const financialRevenue = rows.financial
+    .filter((row) => String(row[2]).toLowerCase().includes("receita"))
+    .reduce((total, row) => total + parseMoney(row[3]), 0);
+  const financialExpense = rows.financial
+    .filter((row) => String(row[2]).toLowerCase().includes("despesa"))
+    .reduce((total, row) => total + parseMoney(row[3]), 0);
   const stockRisk = rows.stock.filter((row) => String(row[5]).toLowerCase().includes("ruptura")).length;
-  const expenses = payrollTotal + 84200;
-  const revenue = Math.max(salesTotal * 18, 486240);
+  const expenses = payrollTotal + financialExpense + 84200;
+  const revenue = Math.max(salesTotal * 18 + financialRevenue, 486240);
   const profit = revenue - expenses;
   const score = Math.max(62, Math.min(96, 88 - stockRisk * 4 + (profit > 0 ? 2 : -10)));
 
@@ -858,6 +909,25 @@ function parseMoney(value) {
     .replace(",", ".");
 
   return Number(numeric) || 0;
+}
+
+function currentShortDate() {
+  const now = new Date();
+  return `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function calculateWorkingCapitalGap() {
+  const payable = rows.financial
+    .filter((row) => String(row[2]).toLowerCase().includes("despesa") && !String(row[4]).toLowerCase().includes("pago"))
+    .reduce((total, row) => total + parseMoney(row[3]), 0);
+  const receivable = rows.financial
+    .filter((row) => String(row[2]).toLowerCase().includes("receita") && !String(row[4]).toLowerCase().includes("pago"))
+    .reduce((total, row) => total + parseMoney(row[3]), 0);
+  const stockReplacement = rows.stock
+    .filter((row) => String(row[5]).toLowerCase().includes("ruptura"))
+    .reduce((total, row) => total + parseMoney(row[4]) * Math.max(0, Number(row[3]) - Number(row[2])), 0);
+
+  return Math.max(0, payable + stockReplacement - receivable);
 }
 
 function downloadCsv(title, headers, data) {
@@ -890,6 +960,7 @@ function buildSmartRecommendations() {
   const weakSuppliers = rows.suppliers.filter((row) => parseInt(row[2], 10) < 85).length;
   const riskyCustomers = rows.customers.filter((row) => String(row[3]).toLowerCase().includes("alto")).length;
   const payrollCost = sumRows(rows.payroll, 3);
+  const workingCapitalGap = calculateWorkingCapitalGap();
 
   const recommendations = [];
 
@@ -907,6 +978,10 @@ function buildSmartRecommendations() {
 
   if (payrollCost > 12000) {
     recommendations.push(["Média", "Revisar folha e comissões antes do fechamento mensal", money.format(payrollCost * 0.08), "Baixo", "Abrir folha"]);
+  }
+
+  if (workingCapitalGap > 0) {
+    recommendations.push(["Alta", "Acompanhar gap de capital de giro antes de novas compras", money.format(workingCapitalGap), workingCapitalGap > 30000 ? "Alto" : "Médio", "Abrir capital"]);
   }
 
   recommendations.push(["Média", "Gerar relatório executivo para acompanhar evolução semanal", money.format(0), "Baixo", "Baixar relatório"]);
@@ -927,6 +1002,11 @@ function getAiPayload() {
       variacao: item.delta,
       observacao: item.help,
     })),
+    lancamentosFinanceiros: rows.financial,
+    capitalDeGiro: {
+      gapProjetado: money.format(calculateWorkingCapitalGap()),
+      planoDeAcao: rows.capital,
+    },
     vendas: rows.sales,
     marketplace: rows.marketplace,
     estoque: rows.stock,

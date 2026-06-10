@@ -962,6 +962,99 @@ Dados usados:
 - Vendas: ${Array.isArray(sales) ? sales.length : 0}`;
 }
 
+function buildDemoAiAnswer(module, data, question) {
+  const message = String(question || "").trim();
+  const normalized = message
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const words = normalized.split(/\s+/).filter(Boolean);
+  const isGreeting = /^(oi|ola|bom dia|boa tarde|boa noite|e ai|eai|hey|hello|hi)$/.test(normalized);
+  const isConfused = /(me ajuda|nao sei|estou perdido|to perdido|to perdido|o que faco)/.test(normalized);
+  const asksStructured = /(relatorio|diagnostico|plano|analise completa|decisao|capital|estoque|financeiro|caixa|vendas)/.test(normalized);
+  const hasNumbers = /\d/.test(message);
+  const hasBusinessData = [
+    data?.estoque,
+    data?.stock,
+    data?.fornecedores,
+    data?.suppliers,
+    data?.vendas,
+    data?.sales,
+    data?.lancamentosFinanceiros,
+    data?.capitalDeGiro?.planoDeAcao,
+    data?.folha,
+    data?.patrimonio,
+    data?.clientes,
+  ].some((value) => Array.isArray(value) ? value.length > 0 : Boolean(value));
+
+  if (!hasBusinessData && (isGreeting || (!hasNumbers && !asksStructured && words.length > 0 && words.length < 5))) {
+    return "Oi! Sou o Nexy, assistente da NexFinance. Posso te ajudar a entender caixa, vendas, estoque, fornecedores ou decisões do negócio. O que você quer analisar agora?";
+  }
+
+  if (!hasBusinessData && isConfused) {
+    return `Vamos por partes. Antes de pensar em uma decisão grande, precisamos descobrir onde está o maior problema hoje.
+
+Me diga qual dessas situações parece mais próxima:
+1. está vendendo pouco;
+2. vende, mas não sobra dinheiro;
+3. falta produto no estoque;
+4. tem muita despesa;
+5. está com contas atrasadas;
+6. quer crescer, mas não sabe se é seguro.
+
+Com isso eu consigo te orientar melhor.`;
+  }
+
+  if (!hasBusinessData && !hasNumbers && !asksStructured && words.length < 14) {
+    return "Consigo te ajudar. Me diga um pouco mais sobre o que você quer analisar: caixa, vendas, estoque, clientes, fornecedores, folha de pagamento ou capital de giro?";
+  }
+
+  const stock = data?.estoque || data?.stock || [];
+  const suppliers = data?.fornecedores || data?.suppliers || [];
+  const sales = data?.vendas || data?.sales || [];
+  const financial = data?.lancamentosFinanceiros || [];
+  const capitalPlan = data?.capitalDeGiro?.planoDeAcao || [];
+  const workingCapitalGap = data?.capitalDeGiro?.gapProjetado || "não informado";
+  const lowStockCount = Array.isArray(stock)
+    ? stock.filter((row) => JSON.stringify(row).toLowerCase().includes("ruptura")).length
+    : 0;
+  const supplierRisk = Array.isArray(suppliers)
+    ? suppliers.filter((row) => Number.parseInt(String(row?.[2] || row?.score || "100"), 10) < 85).length
+    : 0;
+  const pendingExpenses = Array.isArray(financial)
+    ? financial.filter((row) => JSON.stringify(row).toLowerCase().includes("despesa") && JSON.stringify(row).toLowerCase().includes("pendente")).length
+    : 0;
+
+  return `O que eu percebi:
+${lowStockCount > 0 ? `Existem ${lowStockCount} produto(s) com risco de ruptura no estoque.` : "O estoque não mostra ruptura crítica nos dados enviados."}
+${pendingExpenses > 0 ? `Também existem ${pendingExpenses} despesa(s) pendente(s) no financeiro.` : "Não encontrei despesas pendentes críticas no financeiro enviado."}
+
+Por que isso importa:
+Quando estoque, fornecedores e financeiro são analisados juntos, fica mais fácil saber se o problema é venda, reposição, prazo de pagamento ou caixa. O gap de capital de giro informado foi ${workingCapitalGap}.
+
+Risco:
+${lowStockCount > 0 || supplierRisk > 0 || pendingExpenses > 0 ? "Alto, porque há sinais que podem afetar vendas, margem, reposição ou caixa." : "Médio, porque os dados pedem acompanhamento, mas não mostram crise imediata."}
+
+Minha recomendação:
+${supplierRisk > 0 ? "Comece abrindo cotação com fornecedores alternativos e compare prazo, preço e confiabilidade antes da próxima compra." : "Priorize os itens de maior giro e revise compras antes de assumir novos compromissos financeiros."}
+
+Primeiro passo:
+Revise hoje os produtos em ruptura, as despesas pendentes e o plano de capital de giro. Se houver pouco caixa, negocie prazo antes de comprar mais estoque.
+
+Resumo:
+Minha recomendação é usar os dados atuais para proteger caixa e estoque ao mesmo tempo. A IA está considerando os registros cadastrados no dashboard, não apenas dados fixos de demonstração.
+
+Dados usados:
+- Módulo: ${module}
+- Pergunta: ${question || "Análise automática"}
+- Itens de estoque: ${Array.isArray(stock) ? stock.length : 0}
+- Fornecedores: ${Array.isArray(suppliers) ? suppliers.length : 0}
+- Vendas: ${Array.isArray(sales) ? sales.length : 0}
+- Lançamentos financeiros: ${Array.isArray(financial) ? financial.length : 0}
+- Ações de capital de giro: ${Array.isArray(capitalPlan) ? capitalPlan.length : 0}
+- Capital de giro: ${workingCapitalGap}`;
+}
+
 app.listen(PORT, () => {
   console.log("\n========================================");
   console.log("Servidor NexFinance rodando");

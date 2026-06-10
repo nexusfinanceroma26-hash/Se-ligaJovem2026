@@ -867,14 +867,11 @@ select:focus {
 .google-mark {
   width: 24px;
   height: 24px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: #ffffff;
-  border: 1px solid var(--gray-border);
-  color: #0f172a;
-  font-weight: 800;
-  font-family: "Manrope", "Inter", sans-serif;
+  display: block;
+  object-fit: contain;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
 }
 
 .login-divider {
@@ -1349,7 +1346,7 @@ body.login-dark .btn-google:hover {
 
 body.login-dark .google-mark {
   border: none;
-  color: #4285f4;
+  background: transparent;
 }
 
 body.login-dark .login-divider {
@@ -2020,5 +2017,214 @@ body.login-dark .cash-bars i:nth-child(5) { height: 82%; }
   .profile-shell {
     padding-top: calc(24px + env(safe-area-inset-top));
     padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+}
+
+/* PWA auth screens: fixed widths can break narrow Android/iOS viewports. */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+}
+
+.login-container,
+.login-box,
+.mascot-panel,
+.mascot-card,
+.profile-shell,
+.profile-card,
+.offline-shell,
+.offline-card,
+form {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.pwa-install {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 90;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 191, 166, 0.26);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(14px);
+}
+
+.pwa-install.show {
+  display: flex;
+}
+
+.pwa-install strong,
+.pwa-install span {
+  display: block;
+}
+
+.pwa-install strong {
+  color: var(--primary-dark);
+  font-size: 14px;
+}
+
+.pwa-install span {
+  margin-top: 2px;
+  color: var(--gray-text);
+  font-size: 12px;
+}
+
+.pwa-install button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 11px;
+  padding: 0 12px;
+  background: linear-gradient(135deg, var(--secondary-dark), var(--teal));
+  color: #ffffff;
+  font-weight: 800;
+}
+
+@media (max-width: 430px) {
+  body {
+    min-width: 0;
+  }
+
+  .login-container,
+  .login-light,
+  .register-page {
+    width: 100%;
+    min-height: 100dvh;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding: calc(12px + env(safe-area-inset-top)) 10px calc(18px + env(safe-area-inset-bottom));
+    gap: 12px;
+  }
+
+  .login-box,
+  .login-light .login-box {
+    width: 100%;
+    max-width: none;
+    padding: 20px 14px;
+    border-radius: 18px;
+  }
+
+  .brand,
+  .login-light .brand {
+    justify-content: center;
+  }
+
+  .brand-logo,
+  .login-light .brand-logo {
+    width: min(190px, 72vw);
+    max-width: 72vw;
+  }
+
+  .login-eyebrow {
+    margin-top: 18px;
+  }
+
+  .login-box h1,
+  .login-light .login-box h1 {
+    margin-top: 14px;
+    font-size: clamp(28px, 9vw, 34px);
+    line-height: 1.08;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  .login-box p,
+  .login-light .login-box p {
+    max-width: none;
+    margin-bottom: 20px;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  label {
+    margin-top: 12px;
+  }
+
+  input,
+  select,
+  textarea,
+  .btn-primary,
+  .btn-secondary,
+  .btn-google,
+  .btn-ghost {
+    width: 100%;
+    min-height: 50px;
+    font-size: 16px;
+  }
+
+  .forgot {
+    text-align: center;
+  }
+
+  .login-divider {
+    margin: 18px 0;
+  }
+
+  .terms,
+  .signup-text {
+    font-size: 12px;
+  }
+
+  .mascot-panel,
+  .login-light .mascot-panel,
+  body.login-dark .mascot-panel {
+    display: none;
+  }
+
+  .offline-card {
+    padding: 22px 16px;
+    border-radius: 18px;
+  }
+
+  .offline-card img {
+    width: min(170px, 70vw);
+  }
+
+  .pwa-install {
+    left: 10px;
+    right: 10px;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pwa-install.show {
+    display: flex;
+  }
+}
+
+@media (max-width: 360px) {
+  .login-container,
+  .login-light,
+  .register-page {
+    padding-inline: 8px;
+  }
+
+  .login-box,
+  .login-light .login-box {
+    padding-inline: 12px;
+  }
+
+  .login-box h1,
+  .login-light .login-box h1 {
+    font-size: 27px;
   }
 }

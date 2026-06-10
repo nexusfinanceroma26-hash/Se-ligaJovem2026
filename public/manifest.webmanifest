@@ -1,0 +1,72 @@
+{
+  "name": "NexFinance",
+  "short_name": "NexFinance",
+  "id": "/",
+  "description": "NexFinance: gestao financeira, estoque, vendas, fornecedores, relatorios e assistente IA para pequenos negocios.",
+  "start_url": "/login.html",
+  "scope": "/",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#061b2e",
+  "categories": ["business", "finance", "productivity"],
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/img/LOGO-NEX.png.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/img/LOGO-NEX.png.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/img/Mascote-png.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/img/LOGO-NEX.png.png",
+      "sizes": "1536x1024",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "NexFinance - gestao inteligente"
+    },
+    {
+      "src": "/img/Mascote-png.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Nexy, assistente da NexFinance"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "icons": [{ "src": "/img/LOGO-NEX.png.png", "sizes": "192x192", "type": "image/png" }],
+      "url": "/dashboard.html",
+      "description": "Abrir painel principal"
+    },
+    {
+      "name": "Assistente IA",
+      "short_name": "Nexy",
+      "icons": [{ "src": "/img/Mascote-png.png", "sizes": "192x192", "type": "image/png" }],
+      "url": "/dashboard.html#assistant",
+      "description": "Abrir assistente da NexFinance"
+    }
+  ],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 420
+  }
+}

@@ -1121,3 +1121,244 @@ tr:last-child td {
     background: rgba(248, 250, 252, 0.94);
   }
 }
+
+/* PWA mobile hardening: prevents viewport overflow on Android/iOS installs. */
+html,
+body,
+#app,
+.app-shell {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+}
+
+.app,
+.main,
+.content,
+.grid,
+.split,
+.panel,
+.card,
+.presentation-guide,
+.guide-steps,
+.item,
+.table-wrap,
+.drawer,
+.chat,
+.messages,
+.composer {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.pwa-install {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 90;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 191, 166, 0.26);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(14px);
+}
+
+.pwa-install.show {
+  display: flex;
+}
+
+.pwa-install strong,
+.pwa-install span {
+  display: block;
+}
+
+.pwa-install strong {
+  color: var(--primary-dark);
+  font-size: 14px;
+}
+
+.pwa-install span {
+  margin-top: 2px;
+  color: var(--gray-text);
+  font-size: 12px;
+}
+
+.pwa-install button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 11px;
+  padding: 0 12px;
+  background: linear-gradient(135deg, var(--secondary-dark), var(--teal));
+  color: #ffffff;
+  font-weight: 800;
+}
+
+@media (max-width: 430px) {
+  :root {
+    --sidebar-width: 286px;
+  }
+
+  .content {
+    width: 100%;
+    padding: 14px 10px calc(88px + env(safe-area-inset-bottom));
+  }
+
+  .topbar {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 10px;
+  }
+
+  .page-head {
+    gap: 12px;
+  }
+
+  .page-head h1 {
+    font-size: 25px;
+    overflow-wrap: anywhere;
+  }
+
+  .page-head p,
+  .card p,
+  .panel p,
+  .item p {
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+
+  .grid {
+    gap: 12px;
+  }
+
+  .panel,
+  .card,
+  .presentation-guide,
+  .lane {
+    padding: 14px;
+    border-radius: 13px;
+  }
+
+  .cols-2,
+  .cols-3,
+  .cols-4,
+  .split,
+  .guide-steps,
+  .kanban {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .metric {
+    min-height: auto;
+  }
+
+  .metric-value {
+    font-size: clamp(22px, 9vw, 28px);
+    overflow-wrap: anywhere;
+  }
+
+  .actions .btn,
+  .tabs .tab,
+  .row-actions .table-action {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 12px;
+  }
+
+  table {
+    min-width: 620px;
+  }
+
+  th,
+  td {
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  .drawer {
+    max-height: 90dvh;
+    padding-inline: 14px;
+  }
+
+  .field input,
+  .field select,
+  .field textarea,
+  .composer input {
+    font-size: 16px;
+  }
+
+  .msg {
+    max-width: 100%;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .chart {
+    height: 190px;
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  .bar {
+    min-width: 18px;
+  }
+
+  .bar label {
+    font-size: 10px;
+  }
+
+  .pwa-install {
+    left: 10px;
+    right: 10px;
+    align-items: stretch;
+    display: none;
+    flex-direction: column;
+  }
+
+  .pwa-install.show {
+    display: flex;
+  }
+}
+
+@media (max-width: 360px) {
+  .content {
+    padding-inline: 8px;
+  }
+
+  .panel,
+  .card,
+  .presentation-guide,
+  .lane {
+    padding: 12px;
+  }
+
+  .btn,
+  .tab,
+  .table-action {
+    padding-inline: 10px;
+    font-size: 12px;
+  }
+
+  table {
+    min-width: 580px;
+  }
+}
