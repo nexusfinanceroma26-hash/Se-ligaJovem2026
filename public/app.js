@@ -1,4 +1,4 @@
-const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+﻿const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 function getInitialRoute() {
   const route = window.location.hash.replace("#", "").trim();
@@ -26,7 +26,7 @@ const state = {
 const menu = [
   ["Gestão", [
     ["dashboard", "Visão Geral", "⌂"],
-    ["stock", "Estoque", "▣"],
+    ["stock", "Estoque", "□"],
     ["sales", "Vendas", "◴"],
     ["marketplace", "Marketplace", "▤"],
     ["financial", "Financeiro", "$"],
@@ -41,7 +41,7 @@ const menu = [
   ["Inteligência", [
     ["investors", "Investidores", "◌"],
     ["assistant", "Assistente IA", "✦"],
-    ["recommendations", "Recomendações IA", "◈"],
+    ["recommendations", "Recomendações IA", "◆"],
     ["reports", "Relatórios", "▦"],
     ["settings", "Configurações", "⚙"],
   ]],
@@ -362,7 +362,7 @@ function topbar() {
     ]),
     el("div", { class: "top-actions" }, [
       pill("Modo apresentação", "info"),
-      btn("Nova ação", "＋", true, () => openDrawer("Nova ação")),
+      btn("Nova ação", "+", true, () => openDrawer("Nova ação")),
       el("button", { class: "btn danger", onclick: logout }, ["Sair"]),
     ]),
   ]);
@@ -462,7 +462,7 @@ function dataPage(key) {
   const [title, subtitle, headers] = pageInfo[key];
   return el("div", { class: "grid" }, [
     head(title, subtitle, [
-      btn("Novo registro", "＋", true, () => openDrawer(`Novo ${title}`, key)),
+      btn("Novo registro", "+", true, () => openDrawer(`Novo ${title}`, key)),
       btn("Importar CSV", "⇧", false, () => toast("Importação simulada com sucesso.")),
       btn("Exportar", "⇩", false, () => downloadCsv(title, headers, rows[key])),
     ]),
@@ -486,7 +486,7 @@ function financial() {
   const cashForecast = sumRows(rows.sales, 2) + sumRows(rows.marketplace, 2) + receivable - payable;
 
   return el("div", { class: "grid" }, [
-    head("Financeiro", "Fluxo de caixa, contas a pagar, contas a receber e conciliação.", [btn("Novo lançamento", "＋", true, () => openDrawer("Novo lançamento financeiro", "financial"))]),
+    head("Financeiro", "Fluxo de caixa, contas a pagar, contas a receber e conciliação.", [btn("Novo lançamento", "+", true, () => openDrawer("Novo lançamento financeiro", "financial"))]),
     el("div", { class: "grid cols-4" }, [
       metric({ label: "Contas a receber", value: money.format(receivable), delta: "+9,8%", help: "Lançamentos pendentes de receita", progress: Math.min(92, Math.max(24, receivable / 1800)) }),
       metric({ label: "Contas a pagar", value: money.format(payable), delta: payable ? "-2,4%" : "0%", help: "Despesas ainda pendentes", progress: Math.min(92, Math.max(20, payable / 1200)) }),
@@ -549,7 +549,7 @@ function recommendations() {
 
 function reports() {
   return el("div", { class: "grid" }, [
-    head("Relatórios", "PDF, planilhas e visão executiva para apresentação.", [btn("Baixar relatório", "⇩", true, () => downloadExecutiveReport()), btn("Agendar envio", "◷", false, () => openDrawer("Agendar relatório", "reports"))]),
+    head("Relatórios", "PDF, planilhas e visão executiva para apresentação.", [btn("Baixar relatório", "⇩", true, () => downloadExecutiveReport()), btn("Agendar envio", "▷", false, () => openDrawer("Agendar relatório", "reports"))]),
     el("div", { class: "kanban" }, [
       lane("Prontos", ["DRE gerencial - Maio", "Fluxo de caixa 30 dias", "Estoque crítico"]),
       lane("Agendados", ["Análise semanal IA", "LGPD mensal", "Marketplace performance"]),
@@ -1157,3 +1157,4 @@ function slug(value) {
 }
 
 render();
+

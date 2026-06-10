@@ -1,4 +1,4 @@
-const CACHE_NAME = "nexfinance-pwa-v8";
+﻿const CACHE_NAME = "nexfinance-pwa-v10";
 const APP_SHELL = [
   "/",
   "/login.html",
@@ -81,3 +81,6 @@ self.addEventListener("fetch", (event) => {
     })),
   );
 });
+
+
+

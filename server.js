@@ -1,4 +1,4 @@
-require("dotenv").config();
+﻿require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
@@ -199,18 +199,19 @@ app.post("/api/auth/register-old", authLimiter, async (req, res) => {
 
 app.post("/api/auth/register", authLimiter, async (req, res) => {
   try {
-    let { name, email, password, company, cnpj } = req.body;
+    let { name, username, email, password, company, cnpj } = req.body;
 
     const validation = validateRegisterInput({ name, email, password, company });
     if (!validation.isValid) {
       return res.status(400).json({
         success: false,
-        message: "Erro na validaÃ§Ã£o.",
+        message: "Erro na validação.",
         errors: validation.errors,
       });
     }
 
     name = sanitizeInput(name);
+    username = normalizeUsername(username, email);
     email = sanitizeInput(email).toLowerCase();
     company = sanitizeInput(company);
     cnpj = sanitizeInput(cnpj);
@@ -219,7 +220,7 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
     if (existingDemoUser) {
       return res.status(409).json({
         success: false,
-        message: "Este email jÃ¡ estÃ¡ cadastrado.",
+        message: "Este email já está cadastrado.",
       });
     }
 
@@ -237,7 +238,7 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
       if (existingUser) {
         return res.status(409).json({
           success: false,
-          message: "Este email jÃ¡ estÃ¡ cadastrado.",
+          message: "Este email já está cadastrado.",
         });
       }
     }
@@ -261,14 +262,14 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
     return res.status(201).json({
       success: true,
       requiresEmailVerification: true,
-      message: "Enviamos um link de validaÃ§Ã£o para o email cadastrado. Confirme o email antes de fazer login.",
+      message: "Enviamos um link de validação para o email cadastrado. Confirme o email antes de fazer login.",
       devVerificationUrl: hasEmailProvider() ? undefined : verificationUrl,
     });
   } catch (error) {
     console.error("Erro no cadastro:", error);
     return res.status(500).json({
       success: false,
-      message: "Erro ao criar validaÃ§Ã£o por email. Tente novamente em instantes.",
+      message: "Erro ao criar validação por email. Tente novamente em instantes.",
     });
   }
 });
@@ -282,7 +283,7 @@ app.get("/api/auth/verify-email", async (req, res) => {
     if (!pendingRegistration || pendingRegistration.expires_at < Date.now()) {
       return res.status(400).send(renderVerificationPage({
         title: "Link expirado",
-        message: "Esse link de validaÃ§Ã£o expirou ou jÃ¡ foi usado. Crie a conta novamente para receber um novo link.",
+        message: "Esse link de validação expirou ou já foi usado. Crie a conta novamente para receber um novo link.",
         linkLabel: "Voltar ao cadastro",
         linkHref: "/cadastro.html",
       }));
@@ -302,7 +303,7 @@ app.get("/api/auth/verify-email", async (req, res) => {
 
       return res.status(200).send(renderVerificationPage({
         title: "Email confirmado",
-        message: "Sua conta foi validada com sucesso. Agora vocÃª jÃ¡ pode entrar na NexFinance.",
+        message: "Sua conta foi validada com sucesso. Agora você já pode entrar na NexFinance.",
         linkLabel: "Ir para o login",
         linkHref: "/login.html?verified=1",
       }));
@@ -317,8 +318,8 @@ app.get("/api/auth/verify-email", async (req, res) => {
     if (existingUser) {
       removePendingRegistration(pendingRegistration.email);
       return res.status(200).send(renderVerificationPage({
-        title: "Email jÃ¡ confirmado",
-        message: "Essa conta jÃ¡ estÃ¡ ativa. Entre com seu email e senha.",
+        title: "Email já confirmado",
+        message: "Essa conta já está ativa. Entre com seu email e senha.",
         linkLabel: "Ir para o login",
         linkHref: "/login.html?verified=1",
       }));
@@ -338,7 +339,7 @@ app.get("/api/auth/verify-email", async (req, res) => {
     if (insertError || !newUser?.length) {
       return res.status(500).send(renderVerificationPage({
         title: "Erro ao criar conta",
-        message: "NÃ£o foi possÃ­vel ativar sua conta agora. Tente novamente em instantes.",
+        message: "Não foi possível ativar sua conta agora. Tente novamente em instantes.",
         linkLabel: "Voltar ao cadastro",
         linkHref: "/cadastro.html",
       }));
@@ -356,15 +357,15 @@ app.get("/api/auth/verify-email", async (req, res) => {
     removePendingRegistration(pendingRegistration.email);
     return res.status(200).send(renderVerificationPage({
       title: "Email confirmado",
-      message: "Sua conta foi validada com sucesso. Agora vocÃª jÃ¡ pode entrar na NexFinance.",
+      message: "Sua conta foi validada com sucesso. Agora você já pode entrar na NexFinance.",
       linkLabel: "Ir para o login",
       linkHref: "/login.html?verified=1",
     }));
   } catch (error) {
     console.error("Erro ao validar email:", error);
     return res.status(500).send(renderVerificationPage({
-      title: "Erro na validaÃ§Ã£o",
-      message: "NÃ£o foi possÃ­vel validar esse email agora. Tente novamente em instantes.",
+      title: "Erro na validação",
+      message: "Não foi possível validar esse email agora. Tente novamente em instantes.",
       linkLabel: "Voltar ao login",
       linkHref: "/login.html",
     }));
@@ -389,7 +390,7 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
     if (pendingRegistrationsByEmail.has(email)) {
       return res.status(403).json({
         success: false,
-        message: "Confirme seu email antes de fazer login. Enviamos um link de validaÃ§Ã£o no cadastro.",
+        message: "Confirme seu email antes de fazer login. Enviamos um link de validação no cadastro.",
       });
     }
 
@@ -442,6 +443,176 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Erro interno no servidor ao fazer login.",
+    });
+  }
+});
+
+app.get("/api/auth/google/config", (req, res) => {
+  return res.status(200).json({
+    success: true,
+    clientId: process.env.GOOGLE_CLIENT_ID || "",
+  });
+});
+
+app.post("/api/auth/google", authLimiter, async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(400).json({
+        success: false,
+        message: "Google Login ainda não foi configurado. Adicione GOOGLE_CLIENT_ID no .env.",
+      });
+    }
+
+    const googleProfile = await verifyGoogleCredential(credential);
+    const email = sanitizeInput(googleProfile.email).toLowerCase();
+    const name = sanitizeInput(googleProfile.name || email.split("@")[0]);
+
+    if (!email || !googleProfile.email_verified) {
+      return res.status(401).json({
+        success: false,
+        message: "Não foi possível confirmar esse email do Google.",
+      });
+    }
+
+    const demoUser = demoUsers.find((user) => user.email === email);
+    if (demoUser) {
+      return res.status(200).json(makeAuthResponse(demoUser, "Login com Google realizado com sucesso."));
+    }
+
+    if (supabase) {
+      const { data: users, error } = await supabase
+        .from("users")
+        .select("id, name, email, company_name, password_hash")
+        .eq("email", email)
+        .limit(1);
+
+      if (error) {
+        return res.status(500).json({
+          success: false,
+          message: "Erro ao verificar sua conta Google no banco.",
+        });
+      }
+
+      if (users?.[0]) {
+        return res.status(200).json(makeAuthResponse(users[0], "Login com Google realizado com sucesso."));
+      }
+    }
+
+    const profileToken = jwt.sign(
+      {
+        purpose: "google_signup",
+        email,
+        name,
+        picture: googleProfile.picture || "",
+      },
+      JWT_SECRET,
+      { expiresIn: "15m" },
+    );
+
+    return res.status(200).json({
+      success: true,
+      requiresPassword: true,
+      message: "Conta Google verificada. Crie uma senha para concluir seu cadastro.",
+      profileToken,
+      profile: {
+        name,
+        email,
+        picture: googleProfile.picture || "",
+      },
+    });
+  } catch (error) {
+    console.error("Erro no login com Google:", error);
+    return res.status(401).json({
+      success: false,
+      message: "Não foi possível validar sua conta Google.",
+    });
+  }
+});
+
+app.post("/api/auth/google/complete", authLimiter, async (req, res) => {
+  try {
+    const { profileToken, password, company = "Empresa NexFinance" } = req.body;
+
+    if (!password || String(password).length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "A senha precisa ter pelo menos 6 caracteres.",
+      });
+    }
+
+    const profile = jwt.verify(profileToken, JWT_SECRET);
+    if (profile.purpose !== "google_signup" || !profile.email) {
+      return res.status(401).json({
+        success: false,
+        message: "Sessão do Google inválida. Selecione sua conta novamente.",
+      });
+    }
+
+    const email = sanitizeInput(profile.email).toLowerCase();
+    const name = sanitizeInput(profile.name || email.split("@")[0]);
+    const companyName = sanitizeInput(company || "Empresa NexFinance");
+    const existingDemoUser = demoUsers.find((user) => user.email === email);
+
+    if (existingDemoUser) {
+      return res.status(200).json(makeAuthResponse(existingDemoUser, "Conta Google já existente. Login realizado."));
+    }
+
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+
+    if (!supabase) {
+      const newUser = {
+        id: `demo-google-${Date.now()}`,
+        name,
+        username: normalizeUsername("", email),
+        email,
+        company_name: companyName,
+        password_hash: passwordHash,
+      };
+
+      demoUsers.push(newUser);
+      return res.status(201).json(makeAuthResponse(newUser, "Conta Google criada em modo demonstração."));
+    }
+
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id, name, email, company_name, password_hash")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (existingUser) {
+      return res.status(200).json(makeAuthResponse(existingUser, "Conta Google já existente. Login realizado."));
+    }
+
+    const { data: newUser, error: insertError } = await supabase
+      .from("users")
+      .insert([{
+        name,
+        email,
+        password_hash: passwordHash,
+        company_name: companyName,
+        created_at: new Date().toISOString(),
+      }])
+      .select("id, name, email, company_name");
+
+    if (insertError || !newUser?.length) {
+      return res.status(500).json({
+        success: false,
+        message: "Não foi possível criar a conta com Google agora.",
+      });
+    }
+
+    await supabase
+      .from("companies")
+      .insert([{ owner_id: newUser[0].id, name: companyName, cnpj: null, status: "active" }]);
+
+    return res.status(201).json(makeAuthResponse(newUser[0], "Conta Google criada com sucesso."));
+  } catch (error) {
+    console.error("Erro ao concluir cadastro Google:", error);
+    return res.status(401).json({
+      success: false,
+      message: "Sessão do Google expirada. Selecione sua conta novamente.",
     });
   }
 });
@@ -608,8 +779,31 @@ function hasEmailProvider() {
   return Boolean(process.env.RESEND_API_KEY || process.env.EMAIL_PROVIDER_API_KEY);
 }
 
+async function verifyGoogleCredential(credential) {
+  if (!credential) {
+    throw new Error("Credencial Google não enviada.");
+  }
+
+  const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+  if (!response.ok) {
+    throw new Error("Token Google inválido.");
+  }
+
+  const profile = await response.json();
+  if (profile.aud !== process.env.GOOGLE_CLIENT_ID) {
+    throw new Error("Cliente Google inválido.");
+  }
+
+  return {
+    email: profile.email,
+    email_verified: profile.email_verified === true || profile.email_verified === "true",
+    name: profile.name,
+    picture: profile.picture,
+  };
+}
+
 async function sendVerificationEmail({ to, name, verificationUrl }) {
-  const apiKey = process.env.RESEND_API_KEY || process.env.EMAIL_PROVIDER_API_KEY;
+  const apiKey = (process.env.RESEND_API_KEY || process.env.EMAIL_PROVIDER_API_KEY || "").trim();
   const from = process.env.EMAIL_FROM || "NexFinance <onboarding@resend.dev>";
 
   if (!apiKey) {
@@ -1391,3 +1585,4 @@ app.listen(PORT, () => {
   console.log(`Banco: ${supabase ? "Supabase" : "Demonstração local"}`);
   console.log("========================================\n");
 });
+

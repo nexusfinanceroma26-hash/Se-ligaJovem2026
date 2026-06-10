@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("cadastroForm");
   const messageBox = document.getElementById("registerMessage");
   const submitButton = form?.querySelector("button[type='submit']");
@@ -127,3 +127,4 @@ document.addEventListener("DOMContentLoaded", () => {
     submitButton.textContent = isLoading ? "Criando conta..." : "Criar conta";
   }
 });
+

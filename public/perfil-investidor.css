@@ -1,4 +1,4 @@
-.profile-shell {
+﻿.profile-shell {
   min-height: 100vh;
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
@@ -378,3 +378,4 @@ body,
     padding-right: max(8px, env(safe-area-inset-right));
   }
 }
+

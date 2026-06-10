@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #e0e5ec;
   --panel: #e0e5ec;
   --panel-2: #d1d9e6;
@@ -393,3 +393,4 @@ tr:last-child td { border-bottom: 0; }
   .kanban { grid-template-columns: 1fr; }
   .top-actions .chip { display: none; }
 }
+

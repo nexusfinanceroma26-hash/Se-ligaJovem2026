@@ -2,7 +2,7 @@
   "name": "NexFinance",
   "short_name": "NexFinance",
   "id": "/",
-  "description": "NexFinance: gestao financeira, estoque, vendas, fornecedores, relatorios e assistente IA para pequenos negocios.",
+  "description": "NexFinance: gestão financeira, estoque, vendas, fornecedores, relatórios e assistente IA para pequenos negócios.",
   "start_url": "/login.html",
   "scope": "/",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
@@ -39,7 +39,7 @@
       "sizes": "1536x1024",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "NexFinance - gestao inteligente"
+      "label": "NexFinance - gestão inteligente"
     },
     {
       "src": "/img/Mascote-png.png",
@@ -70,3 +70,4 @@
     "preferred_width": 420
   }
 }
+

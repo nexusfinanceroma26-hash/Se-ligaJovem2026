@@ -1,4 +1,4 @@
-(function setupNexFinancePwa() {
+﻿(function setupNexFinancePwa() {
   let deferredInstallPrompt = null;
 
   const ua = window.navigator.userAgent.toLowerCase();
@@ -112,3 +112,4 @@
     android: installOnAndroid,
   };
 })();
+

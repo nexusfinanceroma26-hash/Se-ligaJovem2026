@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("recoverForm");
   const emailInput = document.getElementById("email");
   const messageBox = document.getElementById("recoverMessage");
@@ -57,3 +57,4 @@ document.addEventListener("DOMContentLoaded", () => {
     submitButton.textContent = isLoading ? "Enviando..." : "Enviar instruções";
   }
 });
+

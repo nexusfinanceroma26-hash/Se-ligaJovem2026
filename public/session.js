@@ -1,4 +1,4 @@
-const API_URL = "/api";
+﻿const API_URL = "/api";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const token = localStorage.getItem("nexfinance_token");
@@ -32,3 +32,4 @@ function clearSession() {
   localStorage.removeItem("nexfinance_user");
   window.location.href = "login.html";
 }
+

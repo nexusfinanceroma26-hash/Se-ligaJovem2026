@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
   const token = localStorage.getItem("nexfinance_token");
   const user = getUser();
   const form = document.querySelector("#investorProfileForm");
@@ -186,3 +186,4 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 });
+

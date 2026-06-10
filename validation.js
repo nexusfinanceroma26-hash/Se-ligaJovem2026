@@ -1,4 +1,4 @@
-// Validação de entrada com expressões regulares
+﻿// Validação de entrada com expressões regulares
 
 const validateEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -79,3 +79,4 @@ module.exports = {
   validateRegisterInput,
   validateLoginInput,
 };
+
