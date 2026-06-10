@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -8,9 +8,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="NexFinance">
   <title>Criar Conta | NexFinance</title>
-  <link rel="icon" type="image/png" href="img/LOGO-NEX.png.png">
+  <link rel="icon" type="image/png" href="img/nexfinance-app-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="img/LOGO-NEX.png.png">
+  <link rel="apple-touch-icon" href="img/nexfinance-app-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -20,16 +20,19 @@
   <main class="login-container login-light register-page">
     <section class="login-box">
       <a class="brand" href="login.html" aria-label="NexFinance">
-        <img class="brand-logo" src="img/LOGO-NEX.png.png" alt="NexFinance - Seu Sucesso, Nossa Inteligência">
+        <img class="brand-logo" src="img/LOGO-NEX.png.png" alt="NexFinance - Seu Sucesso, Nossa InteligÃªncia">
       </a>
 
       <span class="login-eyebrow">Nova empresa</span>
       <h1>Crie sua conta</h1>
-      <p>Organize clientes, estoque, vendas e financeiro em uma plataforma preparada para pequenos negócios.</p>
+      <p>Organize clientes, estoque, vendas e financeiro em uma plataforma preparada para pequenos negÃ³cios.</p>
 
       <form id="cadastroForm">
         <label for="name">Nome completo</label>
         <input type="text" id="name" name="name" placeholder="Seu nome" autocomplete="name" required>
+
+        <label for="username">Nome de usuário <span class="optional-label">opcional</span></label>
+        <input type="text" id="username" name="username" placeholder="Ex: joao.financeiro" autocomplete="username" minlength="3">
 
         <label for="company">Nome da empresa</label>
         <input type="text" id="company" name="company" placeholder="Ex: NexFinance Consultoria" autocomplete="organization" required>
@@ -46,10 +49,10 @@
         <button type="submit" class="btn-primary">Criar conta</button>
         <div id="registerMessage" class="message" aria-live="polite"></div>
 
-        <p class="signup-text">Já tem uma conta? <a href="login.html">Entrar</a></p>
+        <p class="signup-text">JÃ¡ tem uma conta? <a href="login.html">Entrar</a></p>
       </form>
 
-      <a href="index.html" class="back-link">Voltar para a página inicial</a>
+      <a href="index.html" class="back-link">Voltar para a pÃ¡gina inicial</a>
     </section>
 
     <section class="mascot-panel" aria-label="Resumo NexFinance">
@@ -58,7 +61,7 @@
         <div class="finance-card finance-card-revenue">
           <span>Receita</span>
           <strong>R$ 128.540,00</strong>
-          <small>▲ 18,6% vs mês anterior</small>
+          <small>â–² 18,6% vs mÃªs anterior</small>
           <div class="sparkline sparkline-up" aria-hidden="true"></div>
         </div>
 

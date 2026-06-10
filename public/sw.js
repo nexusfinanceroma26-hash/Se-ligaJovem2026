@@ -1,4 +1,4 @@
-const CACHE_NAME = "nexfinance-pwa-v4";
+const CACHE_NAME = "nexfinance-pwa-v8";
 const APP_SHELL = [
   "/",
   "/login.html",
@@ -17,6 +17,7 @@ const APP_SHELL = [
   "/app.js",
   "/pwa.js",
   "/manifest.webmanifest",
+  "/img/nexfinance-app-icon.png",
   "/img/LOGO-NEX.png.png",
   "/img/Mascote-png.png"
 ];

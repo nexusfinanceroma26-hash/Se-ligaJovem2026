@@ -108,6 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const demoUser = {
       id: "demo",
       name: "Usuário Teste",
+      username: "usuario.teste",
       email: "teste@nexfinance.com",
     };
 

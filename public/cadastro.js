@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
     clearMessage();
 
     const name = document.getElementById("name").value.trim();
+    const username = document.getElementById("username")?.value.trim() || "";
     const company = document.getElementById("company").value.trim();
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value.trim();
@@ -22,6 +23,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (company.length < 3) {
       showMessage("Informe o nome da empresa com pelo menos 3 caracteres.", "error");
+      return;
+    }
+
+    if (username && !/^[a-zA-Z0-9._-]{3,24}$/.test(username)) {
+      showMessage("Use um nome de usuário com 3 a 24 caracteres, apenas letras, números, ponto, traço ou underline.", "error");
       return;
     }
 
@@ -45,6 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         body: JSON.stringify({
           name,
+          username,
           company,
           email,
           password,
@@ -58,35 +65,16 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      if (data.token) {
-        localStorage.setItem("nexfinance_token", data.token);
+      localStorage.removeItem("nexfinance_token");
+      localStorage.removeItem("nexfinance_user");
+      showMessage(data.message || "Enviamos um link de validação para o email cadastrado.", "success");
+
+      if (data.devVerificationUrl) {
+        showDevVerificationLink(data.devVerificationUrl);
       }
-
-      if (data.user) {
-        localStorage.setItem("nexfinance_user", JSON.stringify(data.user));
-      }
-
-      showMessage("Conta criada com sucesso. Preparando seu perfil...", "success");
-
-      setTimeout(() => {
-        window.location.href = "perfil-investidor.html";
-      }, 900);
     } catch (error) {
       console.error("Erro ao criar conta:", error);
-      const demoUser = {
-        id: `demo-${Date.now()}`,
-        name,
-        email,
-        company,
-      };
-
-      localStorage.setItem("nexfinance_token", "demo-presentation-token");
-      localStorage.setItem("nexfinance_user", JSON.stringify(demoUser));
-      showMessage("Servidor indisponível. Conta criada em modo apresentação.", "success");
-
-      setTimeout(() => {
-        window.location.href = "perfil-investidor.html";
-      }, 900);
+      showMessage("Não foi possível enviar a validação agora. Tente novamente em instantes.", "error");
     } finally {
       setLoading(false);
     }
@@ -114,6 +102,17 @@ document.addEventListener("DOMContentLoaded", () => {
       messageBox.style.background = "#fee2e2";
       messageBox.style.border = "1px solid #ef4444";
     }
+  }
+
+  function showDevVerificationLink(url) {
+    if (!messageBox) return;
+
+    const helper = document.createElement("div");
+    helper.style.marginTop = "10px";
+    helper.style.fontSize = "13px";
+    helper.style.lineHeight = "1.5";
+    helper.innerHTML = `Modo local: <a href="${url}" style="color:#005b4f;font-weight:800;text-decoration:underline;">clique aqui para validar este email</a>.`;
+    messageBox.appendChild(helper);
   }
 
   function clearMessage() {

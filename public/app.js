@@ -263,10 +263,29 @@ const drawerSchemas = {
 
 function readUser() {
   try {
-    return JSON.parse(localStorage.getItem("nexfinance_user")) || { name: "Usuário Teste", role: "Admin" };
+    return enrichUserProfile(JSON.parse(localStorage.getItem("nexfinance_user")) || {});
   } catch {
-    return { name: "Usuário Teste", role: "Admin" };
+    return enrichUserProfile({});
   }
+}
+
+function enrichUserProfile(user = {}) {
+  const emailUsername = String(user.email || "")
+    .split("@")[0]
+    .replace(/[^a-zA-Z0-9._-]/g, ".")
+    .replace(/[.]{2,}/g, ".")
+    .replace(/^\.|\.$/g, "");
+
+  const username = user.username || emailUsername || "usuario";
+  const displayName = user.displayName || user.name || username || "Usuário Teste";
+
+  return {
+    ...user,
+    name: displayName,
+    username,
+    displayName,
+    role: user.role || "Admin",
+  };
 }
 
 function el(tag, attrs = {}, children = []) {
@@ -303,7 +322,7 @@ function app() {
 function ensureDemoSession() {
   if (!localStorage.getItem("nexfinance_token")) {
     localStorage.setItem("nexfinance_token", "demo-presentation-token");
-    localStorage.setItem("nexfinance_user", JSON.stringify({ id: "demo", name: "Usuário Teste", email: "demo@nexfinance.com" }));
+    localStorage.setItem("nexfinance_user", JSON.stringify({ id: "demo", name: "Usuário Teste", username: "usuario.teste", email: "demo@nexfinance.com" }));
     state.user = readUser();
   }
 }
@@ -321,8 +340,8 @@ function sidebar() {
       }, [el("span", { class: "nav-icon" }, [icon]), label])),
     ])),
     el("div", { class: "sidebar-user" }, [
-      el("div", { class: "avatar" }, [initials(state.user.name)]),
-      el("div", {}, [el("strong", {}, [state.user.name || "Usuário Teste"]), el("span", {}, ["Administrador"])]),
+      el("div", { class: "avatar" }, [initials(state.user.displayName)]),
+      el("div", {}, [el("strong", {}, [state.user.displayName || "Usuário Teste"]), el("span", {}, [`@${state.user.username || "usuario"}`])]),
     ]),
   ]);
 }

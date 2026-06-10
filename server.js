@@ -8,6 +8,7 @@ const helmet = require("helmet");
 const compression = require("compression");
 const rateLimit = require("express-rate-limit");
 const path = require("path");
+const crypto = require("crypto");
 const { GoogleGenAI } = require("@google/genai");
 const supabase = require("./supabaseClient");
 const {
@@ -36,6 +37,9 @@ const demoUsers = [
     password_hash: bcrypt.hashSync("123456", 10),
   },
 ];
+const pendingRegistrationsByToken = new Map();
+const pendingRegistrationsByEmail = new Map();
+const EMAIL_VERIFICATION_EXPIRES_MS = 1000 * 60 * 60 * 24;
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression());
@@ -99,9 +103,9 @@ app.get("/api/test-db", async (req, res) => {
   }
 });
 
-app.post("/api/auth/register", authLimiter, async (req, res) => {
+app.post("/api/auth/register-old", authLimiter, async (req, res) => {
   try {
-    let { name, email, password, company, cnpj } = req.body;
+    let { name, username, email, password, company, cnpj } = req.body;
 
     const validation = validateRegisterInput({ name, email, password, company });
     if (!validation.isValid) {
@@ -113,6 +117,7 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
     }
 
     name = sanitizeInput(name);
+    username = normalizeUsername(username, email);
     email = sanitizeInput(email).toLowerCase();
     company = sanitizeInput(company);
     cnpj = sanitizeInput(cnpj);
@@ -192,6 +197,180 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
   }
 });
 
+app.post("/api/auth/register", authLimiter, async (req, res) => {
+  try {
+    let { name, email, password, company, cnpj } = req.body;
+
+    const validation = validateRegisterInput({ name, email, password, company });
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: "Erro na validaÃ§Ã£o.",
+        errors: validation.errors,
+      });
+    }
+
+    name = sanitizeInput(name);
+    email = sanitizeInput(email).toLowerCase();
+    company = sanitizeInput(company);
+    cnpj = sanitizeInput(cnpj);
+
+    const existingDemoUser = demoUsers.find((user) => user.email === email);
+    if (existingDemoUser) {
+      return res.status(409).json({
+        success: false,
+        message: "Este email jÃ¡ estÃ¡ cadastrado.",
+      });
+    }
+
+    if (pendingRegistrationsByEmail.has(email)) {
+      removePendingRegistration(email);
+    }
+
+    if (supabase) {
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (existingUser) {
+        return res.status(409).json({
+          success: false,
+          message: "Este email jÃ¡ estÃ¡ cadastrado.",
+        });
+      }
+    }
+
+    const verification = createEmailVerificationToken();
+    const verificationUrl = `${getAppBaseUrl(req)}/api/auth/verify-email?token=${verification.token}`;
+
+    pendingRegistrationsByToken.set(verification.tokenHash, {
+      name,
+      username,
+      email,
+      company,
+      cnpj: cnpj || null,
+      password_hash: await bcrypt.hash(password, BCRYPT_ROUNDS),
+      expires_at: Date.now() + EMAIL_VERIFICATION_EXPIRES_MS,
+    });
+    pendingRegistrationsByEmail.set(email, verification.tokenHash);
+
+    await sendVerificationEmail({ to: email, name, verificationUrl });
+
+    return res.status(201).json({
+      success: true,
+      requiresEmailVerification: true,
+      message: "Enviamos um link de validaÃ§Ã£o para o email cadastrado. Confirme o email antes de fazer login.",
+      devVerificationUrl: hasEmailProvider() ? undefined : verificationUrl,
+    });
+  } catch (error) {
+    console.error("Erro no cadastro:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Erro ao criar validaÃ§Ã£o por email. Tente novamente em instantes.",
+    });
+  }
+});
+
+app.get("/api/auth/verify-email", async (req, res) => {
+  try {
+    const token = String(req.query.token || "");
+    const tokenHash = hashToken(token);
+    const pendingRegistration = pendingRegistrationsByToken.get(tokenHash);
+
+    if (!pendingRegistration || pendingRegistration.expires_at < Date.now()) {
+      return res.status(400).send(renderVerificationPage({
+        title: "Link expirado",
+        message: "Esse link de validaÃ§Ã£o expirou ou jÃ¡ foi usado. Crie a conta novamente para receber um novo link.",
+        linkLabel: "Voltar ao cadastro",
+        linkHref: "/cadastro.html",
+      }));
+    }
+
+    if (!supabase) {
+      demoUsers.push({
+        id: `demo-${Date.now()}`,
+        name: pendingRegistration.username || pendingRegistration.name,
+        full_name: pendingRegistration.name,
+        username: pendingRegistration.username,
+        email: pendingRegistration.email,
+        company_name: pendingRegistration.company,
+        password_hash: pendingRegistration.password_hash,
+      });
+      removePendingRegistration(pendingRegistration.email);
+
+      return res.status(200).send(renderVerificationPage({
+        title: "Email confirmado",
+        message: "Sua conta foi validada com sucesso. Agora vocÃª jÃ¡ pode entrar na NexFinance.",
+        linkLabel: "Ir para o login",
+        linkHref: "/login.html?verified=1",
+      }));
+    }
+
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", pendingRegistration.email)
+      .maybeSingle();
+
+    if (existingUser) {
+      removePendingRegistration(pendingRegistration.email);
+      return res.status(200).send(renderVerificationPage({
+        title: "Email jÃ¡ confirmado",
+        message: "Essa conta jÃ¡ estÃ¡ ativa. Entre com seu email e senha.",
+        linkLabel: "Ir para o login",
+        linkHref: "/login.html?verified=1",
+      }));
+    }
+
+    const { data: newUser, error: insertError } = await supabase
+      .from("users")
+      .insert([{
+        name: pendingRegistration.username || pendingRegistration.name,
+        email: pendingRegistration.email,
+        password_hash: pendingRegistration.password_hash,
+        company_name: pendingRegistration.company,
+        created_at: new Date().toISOString(),
+      }])
+      .select("id, name, email, company_name");
+
+    if (insertError || !newUser?.length) {
+      return res.status(500).send(renderVerificationPage({
+        title: "Erro ao criar conta",
+        message: "NÃ£o foi possÃ­vel ativar sua conta agora. Tente novamente em instantes.",
+        linkLabel: "Voltar ao cadastro",
+        linkHref: "/cadastro.html",
+      }));
+    }
+
+    await supabase
+      .from("companies")
+      .insert([{
+        owner_id: newUser[0].id,
+        name: pendingRegistration.company,
+        cnpj: pendingRegistration.cnpj,
+        status: "active",
+      }]);
+
+    removePendingRegistration(pendingRegistration.email);
+    return res.status(200).send(renderVerificationPage({
+      title: "Email confirmado",
+      message: "Sua conta foi validada com sucesso. Agora vocÃª jÃ¡ pode entrar na NexFinance.",
+      linkLabel: "Ir para o login",
+      linkHref: "/login.html?verified=1",
+    }));
+  } catch (error) {
+    console.error("Erro ao validar email:", error);
+    return res.status(500).send(renderVerificationPage({
+      title: "Erro na validaÃ§Ã£o",
+      message: "NÃ£o foi possÃ­vel validar esse email agora. Tente novamente em instantes.",
+      linkLabel: "Voltar ao login",
+      linkHref: "/login.html",
+    }));
+  }
+});
+
 app.post("/api/auth/login", authLimiter, async (req, res) => {
   try {
     let { email, password } = req.body;
@@ -206,6 +385,13 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
     }
 
     email = sanitizeInput(email).toLowerCase();
+
+    if (pendingRegistrationsByEmail.has(email)) {
+      return res.status(403).json({
+        success: false,
+        message: "Confirme seu email antes de fazer login. Enviamos um link de validaÃ§Ã£o no cadastro.",
+      });
+    }
 
     if (!supabase) {
       const user = demoUsers.find((demoUser) => demoUser.email === email);
@@ -394,6 +580,142 @@ app.use("/api", (req, res) => {
   });
 });
 
+function createEmailVerificationToken() {
+  const token = crypto.randomBytes(32).toString("hex");
+  return {
+    token,
+    tokenHash: hashToken(token),
+  };
+}
+
+function hashToken(token) {
+  return crypto.createHash("sha256").update(String(token)).digest("hex");
+}
+
+function removePendingRegistration(email) {
+  const tokenHash = pendingRegistrationsByEmail.get(email);
+  if (tokenHash) {
+    pendingRegistrationsByToken.delete(tokenHash);
+  }
+  pendingRegistrationsByEmail.delete(email);
+}
+
+function getAppBaseUrl(req) {
+  return process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+}
+
+function hasEmailProvider() {
+  return Boolean(process.env.RESEND_API_KEY || process.env.EMAIL_PROVIDER_API_KEY);
+}
+
+async function sendVerificationEmail({ to, name, verificationUrl }) {
+  const apiKey = process.env.RESEND_API_KEY || process.env.EMAIL_PROVIDER_API_KEY;
+  const from = process.env.EMAIL_FROM || "NexFinance <onboarding@resend.dev>";
+
+  if (!apiKey) {
+    console.log("\n========================================");
+    console.log("Validacao de email em modo local");
+    console.log(`Email: ${to}`);
+    console.log(`Link: ${verificationUrl}`);
+    console.log("Configure RESEND_API_KEY e EMAIL_FROM no .env para enviar email de verdade.");
+    console.log("========================================\n");
+    return;
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to,
+      subject: "Confirme seu email na NexFinance",
+      html: buildVerificationEmailHtml({ name, verificationUrl }),
+    }),
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Erro ao enviar email de validacao: ${details}`);
+  }
+}
+
+function buildVerificationEmailHtml({ name, verificationUrl }) {
+  return `
+    <div style="margin:0;padding:32px;background:#f8fafc;font-family:Inter,Arial,sans-serif;color:#061b2e;">
+      <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:24px;padding:32px;box-shadow:0 24px 60px rgba(15,23,42,.08);">
+        <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#00a892;">NexFinance</p>
+        <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15;color:#061b2e;">Confirme seu email</h1>
+        <p style="margin:0 0 18px;font-size:16px;line-height:1.6;color:#475569;">Ola, ${escapeHtml(name)}. Para ativar sua conta e acessar a plataforma, confirme o email cadastrado.</p>
+        <a href="${verificationUrl}" style="display:inline-block;margin:8px 0 20px;padding:14px 22px;border-radius:12px;background:linear-gradient(135deg,#00334d,#00bfa6);color:#ffffff;text-decoration:none;font-weight:800;">Confirmar email</a>
+        <p style="margin:0;font-size:13px;line-height:1.5;color:#64748b;">Esse link expira em 24 horas. Se voce nao criou essa conta, ignore esta mensagem.</p>
+      </div>
+    </div>
+  `;
+}
+
+function renderVerificationPage({ title, message, linkLabel, linkHref }) {
+  return `
+    <!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>${escapeHtml(title)} | NexFinance</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+        <style>
+          body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f8fafc;color:#061b2e;font-family:Inter,Arial,sans-serif;padding:24px}
+          main{max-width:520px;background:#fff;border:1px solid #e2e8f0;border-radius:24px;padding:34px;box-shadow:0 24px 60px rgba(15,23,42,.08)}
+          strong{display:block;color:#00a892;margin-bottom:10px}
+          h1{font-family:Manrope,Inter,sans-serif;font-size:34px;line-height:1.05;margin:0 0 12px}
+          p{font-size:16px;line-height:1.6;color:#64748b;margin:0 0 24px}
+          a{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,#00334d,#00bfa6);color:#fff;text-decoration:none;font-weight:800}
+        </style>
+      </head>
+      <body>
+        <main>
+          <strong>NexFinance</strong>
+          <h1>${escapeHtml(title)}</h1>
+          <p>${escapeHtml(message)}</p>
+          <a href="${linkHref}">${escapeHtml(linkLabel)}</a>
+        </main>
+      </body>
+    </html>
+  `;
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function normalizeUsername(username, email) {
+  const rawUsername = sanitizeInput(username || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]/g, ".")
+    .replace(/[.]{2,}/g, ".")
+    .replace(/^\.|\.$/g, "");
+  const fallback = String(email || "")
+    .split("@")[0]
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]/g, ".")
+    .replace(/[.]{2,}/g, ".")
+    .replace(/^\.|\.$/g, "")
+    .slice(0, 24);
+
+  return (rawUsername || fallback || "usuario").slice(0, 24);
+}
+
 function verifyToken(req, res, next) {
   const authHeader = req.headers.authorization;
   const token = authHeader?.split(" ")[1];
@@ -427,11 +749,15 @@ function verifyToken(req, res, next) {
 }
 
 function makeAuthResponse(user, message) {
+  const username = normalizeUsername(user.username || user.name, user.email);
+  const displayName = user.display_name || user.name || username;
+
   const token = jwt.sign(
     {
       id: user.id,
       email: user.email,
-      name: user.name,
+      name: displayName,
+      username,
       company: user.company_name,
     },
     JWT_SECRET,
@@ -444,7 +770,9 @@ function makeAuthResponse(user, message) {
     token,
     user: {
       id: user.id,
-      name: user.name,
+      name: displayName,
+      username,
+      displayName,
       email: user.email,
       company: user.company_name,
     },

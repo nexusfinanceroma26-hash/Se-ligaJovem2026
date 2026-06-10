@@ -322,3 +322,59 @@ body,
     padding-inline: 12px;
   }
 }
+
+/* Profile viewport lock for Android/iOS PWA. */
+@media (max-width: 820px) {
+  html {
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+    touch-action: manipulation;
+  }
+
+  .profile-shell {
+    width: 100%;
+    max-width: 100dvw;
+    grid-template-columns: minmax(0, 1fr);
+    margin: 0;
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+
+  .profile-intro,
+  .profile-card,
+  .profile-card form,
+  .form-row,
+  .risk-grid,
+  .risk-option,
+  .risk-option span {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  select,
+  input,
+  textarea,
+  button,
+  .profile-card input {
+    max-width: 100%;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 430px) {
+  .profile-shell {
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+  }
+}
