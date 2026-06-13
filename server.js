@@ -125,7 +125,27 @@ app.get("/api/test-db", async (req, res) => {
       database_status: "Demo",
     });
   }
+const { data, error } = await supabase.auth.signInWithPassword({
+  email,
+  password,
+});
 
+console.log("LOGIN DATA:", data);
+console.log("LOGIN ERROR:", error);
+
+if (error) {
+  return res.status(401).json({
+    success: false,
+    message: error.message,
+  });
+}
+
+return res.status(200).json({
+  success: true,
+  message: "Login realizado com sucesso",
+  user: data.user,
+  session: data.session,
+});
   try {
     const { error } = await supabase.from("users").select("id").limit(1);
     if (error) throw error;
@@ -141,7 +161,7 @@ app.get("/api/test-db", async (req, res) => {
       database_status: "Demo",
     });
   }
-});
+ });
 
 app.post("/api/auth/register-old", (req, res) => {
   return res.status(410).json({
@@ -197,11 +217,11 @@ app.post("/__disabled__/api/auth/register-legacy-disabled", authLimiter, async (
       return sendAuthResponse(res, 201, newUser, "Usuário criado em modo demonstração.");
     }
 
-    const { data: existingUser } = await supabase
-      .from("users")
-      .select("id")
+     const { data: existingUser } = await supabase
+       .from("users")
+       .select("id")
       .eq("email", email)
-      .maybeSingle();
+       .maybeSingle();
 
     if (existingUser) {
       return res.status(409).json({
@@ -210,30 +230,47 @@ app.post("/__disabled__/api/auth/register-legacy-disabled", authLimiter, async (
       });
     }
 
-    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    const { data: newUser, error: insertError } = await supabase
-      .from("users")
-      .insert([{
+const { data: authData, error: insertError } =
+  await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
         name,
-        email,
-        password_hash: passwordHash,
-        company_name: company,
-        created_at: new Date().toISOString(),
-      }])
-      .select("id, name, email, company_name");
+        company_name: company
+      }
+    }
+  });
+
+const newUser = [{
+  id: authData?.user?.id,
+  name,
+  email,
+  company_name: company
+}];
 
     if (insertError || !newUser?.length) {
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao cadastrar usuário.",
-      });
-    }
+  console.error("ERRO INSERT USER:", insertError);
+
+  return res.status(500).json({
+    success: false,
+    message: insertError?.message || "Erro ao cadastrar usuário.",
+    error: insertError
+  });
+}
 
     const userData = newUser[0];
 
-    await supabase
-      .from("companies")
-      .insert([{ owner_id: userData.id, name: company, cnpj: cnpj || null, status: "active" }]);
+    const { data: companyData, error: companyError } = await supabase
+  .from("companies")
+  .insert([{
+    razao_social: company,
+    nome_fantasia: company,
+    cnpj: cnpj || null,
+    status: "active"
+  }]);
+
+console.log("COMPANY ERROR:", companyError);
 
     return sendAuthResponse(res, 201, userData, "Usuário criado com sucesso.");
   } catch (error) {
@@ -427,7 +464,7 @@ app.get("/api/auth/verify-email", async (req, res) => {
     }));
   }
 });
-
+console.log("Registrando rota LOGIN");
 app.post("/api/auth/login", authLimiter, async (req, res) => {
   try {
     let { email, password } = req.body;
@@ -469,12 +506,20 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
       .eq("email", email)
       .limit(1);
 
-    if (queryError) {
-      const demoUser = demoUsers.find((item) => item.email === email);
-      if (demoUser && (await bcrypt.compare(password, demoUser.password_hash))) {
-        return sendAuthResponse(res, 200, demoUser, "Supabase indisponível. Login realizado em modo demonstração.");
-      }
+    // Faz login pela auth do Supabase (valida senha e cria session)
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
+    if (authError) {
+      return res.status(401).json({
+        success: false,
+        message: authError.message,
+      });
+    }
+
+    if (queryError) {
       return res.status(500).json({
         success: false,
         message: "Erro na conexão com o banco.",
@@ -482,15 +527,14 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
     }
 
     const user = users?.[0];
-    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
-      logSecurityEvent("login_failed", req, { email: maskEmail(email), mode: "database" });
-      return res.status(401).json({
+    if (!user) {
+      return res.status(404).json({
         success: false,
-        message: "Email ou senha incorretos.",
+        message: "Usuário não encontrado.",
       });
     }
 
-    // Segurança: bloqueia login de contas criadas pelo fluxo novo antes da validação do email.
+    // Segurança: bloqueia login de contas que ainda não validaram email.
     if (user.email_verified === false) {
       return res.status(403).json({
         success: false,
@@ -498,6 +542,8 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
       });
     }
 
+    // opcional: se quiser checar hash local também, pode manter o compare.
+    // porém o Supabase auth já validou a senha.
     return sendAuthResponse(res, 200, user, "Login realizado com sucesso.");
   } catch (error) {
     console.error("Erro no login:", error);
@@ -722,12 +768,12 @@ app.get("/api/dashboard", verifyToken, async (req, res) => {
       user,
       dashboard: demoDashboard(),
     });
-  } catch (error) {
-    return res.status(500).json({
+   } catch (error) {
+     return res.status(500).json({
       success: false,
-      message: "Erro ao carregar dashboard.",
-    });
-  }
+       message: "Erro ao carregar dashboard.",
+     });
+   }
 });
 
 app.post("/api/auth/logout", (req, res) => {
@@ -929,10 +975,17 @@ app.post("/api/ai/recommendations", aiLimiter, verifyToken, async (req, res) => 
   }
 });
 
+// Fallback s                                                                                         ó para rotas /api que NÃO foram encontradas.
+// Colocar isso no final do arquivo evita mascarar rotas existentes.
 app.use("/api", (req, res) => {
+  console.error("[API 404] Método/rota:", req.method, req.originalUrl);
   return res.status(404).json({
     success: false,
     message: "Rota de API não encontrada.",
+    requested: {
+      method: req.method,
+      path: req.originalUrl,
+    },
   });
 });
 
