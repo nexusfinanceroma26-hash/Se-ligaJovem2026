@@ -263,7 +263,7 @@ const drawerSchemas = {
 
 function readUser() {
   try {
-    return enrichUserProfile(JSON.parse(localStorage.getItem("nexfinance_user")) || {});
+    return enrichUserProfile(JSON.parse(sessionStorage.getItem("nexfinance_user")) || {});
   } catch {
     return enrichUserProfile({});
   }
@@ -307,7 +307,6 @@ function render() {
 }
 
 function app() {
-  ensureDemoSession();
   return el("div", { class: "app" }, [
     sidebar(),
     el("main", { class: "main" }, [
@@ -317,14 +316,6 @@ function app() {
     drawer(),
     el("div", { id: "toast", class: "toast" }),
   ]);
-}
-
-function ensureDemoSession() {
-  if (!localStorage.getItem("nexfinance_token")) {
-    localStorage.setItem("nexfinance_token", "demo-presentation-token");
-    localStorage.setItem("nexfinance_user", JSON.stringify({ id: "demo", name: "Usuário Teste", username: "usuario.teste", email: "demo@nexfinance.com" }));
-    state.user = readUser();
-  }
 }
 
 function sidebar() {
@@ -744,9 +735,9 @@ async function sendAi(event) {
   try {
     const response = await fetch("/api/ai/analyze", {
       method: "POST",
+      credentials: "same-origin",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("nexfinance_token") || "demo-presentation-token"}`,
       },
       body: JSON.stringify({
         module: state.route,
@@ -834,9 +825,17 @@ function toast(message) {
   window.__toastTimer = setTimeout(() => box.classList.remove("show"), 2200);
 }
 
-function logout() {
+async function logout() {
   localStorage.removeItem("nexfinance_token");
-  localStorage.removeItem("nexfinance_user");
+  sessionStorage.removeItem("nexfinance_user");
+  try {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "same-origin",
+    });
+  } catch {
+    // Mesmo se o servidor não responder, a sessão local é encerrada.
+  }
   window.location.href = "login.html";
 }
 
@@ -1077,9 +1076,9 @@ async function updateAiRecommendations() {
   try {
     const response = await fetch("/api/ai/recommendations", {
       method: "POST",
+      credentials: "same-origin",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("nexfinance_token") || "demo-presentation-token"}`,
       },
       body: JSON.stringify({
         data: getAiPayload(),
@@ -1156,5 +1155,25 @@ function slug(value) {
     .replace(/(^-|-$)/g, "");
 }
 
-render();
+initSecureDashboard();
+
+async function initSecureDashboard() {
+  try {
+    const response = await fetch("/api/auth/me", {
+      credentials: "same-origin",
+    });
+
+    if (!response.ok) {
+      window.location.href = "login.html";
+      return;
+    }
+
+    const data = await response.json();
+    sessionStorage.setItem("nexfinance_user", JSON.stringify(data.user));
+    state.user = readUser();
+    render();
+  } catch {
+    window.location.href = "login.html";
+  }
+}
 

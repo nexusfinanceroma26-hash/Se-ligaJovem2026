@@ -1,18 +1,9 @@
-﻿const API_URL = "/api";
+const API_URL = "/api";
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const token = localStorage.getItem("nexfinance_token");
-
-  if (!token) {
-    window.location.href = "login.html";
-    return;
-  }
-
   try {
     const response = await fetch(`${API_URL}/auth/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+      credentials: "same-origin",
     });
 
     if (!response.ok) {
@@ -21,15 +12,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     const data = await response.json();
-    console.log("Sessão válida:", data.user);
+    sessionStorage.setItem("nexfinance_user", JSON.stringify(data.user));
   } catch (error) {
     clearSession();
   }
 });
 
-function clearSession() {
+async function clearSession() {
   localStorage.removeItem("nexfinance_token");
-  localStorage.removeItem("nexfinance_user");
+  sessionStorage.removeItem("nexfinance_user");
+
+  try {
+    await fetch(`${API_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "same-origin",
+    });
+  } catch {
+    // Logout local continua mesmo que o servidor esteja indisponível.
+  }
+
   window.location.href = "login.html";
 }
-

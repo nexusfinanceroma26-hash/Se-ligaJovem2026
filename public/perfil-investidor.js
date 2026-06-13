@@ -1,13 +1,7 @@
-﻿document.addEventListener("DOMContentLoaded", () => {
-  const token = localStorage.getItem("nexfinance_token");
-  const user = getUser();
+﻿document.addEventListener("DOMContentLoaded", async () => {
+  const user = await loadAuthenticatedUser();
   const form = document.querySelector("#investorProfileForm");
   const messageBox = document.querySelector("#profileMessage");
-
-  if (!token) {
-    localStorage.setItem("nexfinance_token", "demo-presentation-token");
-    localStorage.setItem("nexfinance_user", JSON.stringify({ id: "demo", name: "Usuário Teste", email: "demo@nexfinance.com" }));
-  }
 
   if (!form) return;
 
@@ -52,7 +46,7 @@
     // Compatibilidade com o fluxo antigo do login.
     localStorage.setItem("nexfinance_investor_profile", JSON.stringify(finalProfile));
 
-    localStorage.setItem(
+    sessionStorage.setItem(
       "nexfinance_user",
       JSON.stringify({
         ...user,
@@ -70,9 +64,29 @@
     }, 900);
   });
 
+  async function loadAuthenticatedUser() {
+    try {
+      const response = await fetch("/api/auth/me", {
+        credentials: "same-origin",
+      });
+
+      if (!response.ok) {
+        window.location.href = "login.html";
+        return {};
+      }
+
+      const data = await response.json();
+      sessionStorage.setItem("nexfinance_user", JSON.stringify(data.user));
+      return data.user || {};
+    } catch {
+      window.location.href = "login.html";
+      return {};
+    }
+  }
+
   function getUser() {
     try {
-      return JSON.parse(localStorage.getItem("nexfinance_user") || "{}");
+      return JSON.parse(sessionStorage.getItem("nexfinance_user") || "{}");
     } catch {
       return {};
     }
@@ -186,4 +200,6 @@
     }
   }
 });
+
+
 

@@ -2,12 +2,19 @@
 
 const validateEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  return typeof email === "string" && email.length <= 254 && emailRegex.test(email);
 };
 
 const validatePassword = (password) => {
-  // Mínimo 6 caracteres
-  return password && password.length >= 6;
+  // Segurança: regra única do projeto: exatamente 8 caracteres, com letras e números.
+  return typeof password === "string"
+    && password.length === 8
+    && /[A-Za-z]/.test(password)
+    && /\d/.test(password);
+};
+
+const validateLoginPassword = (password) => {
+  return typeof password === "string" && password.length === 8;
 };
 
 const validateName = (name) => {
@@ -40,7 +47,7 @@ const validateRegisterInput = (data) => {
   }
 
   if (!data.password || !validatePassword(data.password)) {
-    errors.push("Senha deve ter no mínimo 6 caracteres");
+    errors.push("Senha deve ter exatamente 8 caracteres, com letras e números");
   }
 
   if (!data.company || !validateCompanyName(data.company)) {
@@ -60,7 +67,7 @@ const validateLoginInput = (data) => {
     errors.push("Email inválido");
   }
 
-  if (!data.password || !validatePassword(data.password)) {
+  if (!data.password || !validateLoginPassword(data.password)) {
     errors.push("Senha inválida");
   }
 
@@ -73,6 +80,7 @@ const validateLoginInput = (data) => {
 module.exports = {
   validateEmail,
   validatePassword,
+  validateLoginPassword,
   validateName,
   validateCompanyName,
   sanitizeInput,

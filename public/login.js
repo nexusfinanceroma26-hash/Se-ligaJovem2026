@@ -105,6 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const result = await fetch("/api/auth/google", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
         },
@@ -149,8 +150,8 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (password.length < 6) {
-      showMessage("A senha precisa ter pelo menos 6 caracteres.", "error");
+    if (password.length !== 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+      showMessage("A senha precisa ter exatamente 8 caracteres, com letras e números.", "error");
       return;
     }
 
@@ -165,6 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const response = await fetch("/api/auth/google/complete", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
         },
@@ -199,6 +201,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
         },
@@ -242,8 +245,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function finishLogin(data) {
-    localStorage.setItem("nexfinance_token", data.token);
-    localStorage.setItem("nexfinance_user", JSON.stringify(data.user));
+    localStorage.removeItem("nexfinance_token");
+    sessionStorage.setItem("nexfinance_user", JSON.stringify(data.user));
 
     const profileKey = getInvestorProfileKey(data.user);
     const hasInvestorProfile = Boolean(localStorage.getItem(profileKey));
@@ -274,9 +277,9 @@ document.addEventListener("DOMContentLoaded", () => {
           <label for="googleCompany">Nome da empresa</label>
           <input id="googleCompany" name="company" type="text" placeholder="Ex: Minha Empresa" required>
           <label for="googlePassword">Senha</label>
-          <input id="googlePassword" name="password" type="password" placeholder="Crie uma senha" minlength="6" required>
+          <input id="googlePassword" name="password" type="password" placeholder="Crie uma senha" minlength="8" maxlength="8" required>
           <label for="googleConfirmPassword">Confirmar senha</label>
-          <input id="googleConfirmPassword" name="confirmPassword" type="password" placeholder="Repita sua senha" minlength="6" required>
+          <input id="googleConfirmPassword" name="confirmPassword" type="password" placeholder="Repita sua senha" minlength="8" maxlength="8" required>
           <button type="submit" class="btn-primary">Criar conta</button>
         </form>
       </div>
@@ -292,7 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function isDemoCredential(email, password) {
-    return email.toLowerCase() === "teste@nexfinance.com" && password === "123456";
+    return email.toLowerCase() === "teste@nexfinance.com" && password === "Senha123";
   }
 
   function startDemoSession(message) {
@@ -303,8 +306,9 @@ document.addEventListener("DOMContentLoaded", () => {
       email: "teste@nexfinance.com",
     };
 
-    localStorage.setItem("nexfinance_token", "demo-presentation-token");
-    localStorage.setItem("nexfinance_user", JSON.stringify(demoUser));
+    localStorage.removeItem("nexfinance_token");
+    sessionStorage.setItem("nexfinance_demo_mode", "1");
+    sessionStorage.setItem("nexfinance_user", JSON.stringify(demoUser));
     localStorage.setItem(getInvestorProfileKey(demoUser), JSON.stringify({ perfil: "Moderado" }));
     showMessage(message, "success");
     startLoginTransition("/dashboard", true);

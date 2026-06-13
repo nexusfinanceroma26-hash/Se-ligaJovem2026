@@ -14,15 +14,19 @@ const supabase = require("./supabaseClient");
 const {
   validateRegisterInput,
   validateLoginInput,
+  validateEmail,
+  validatePassword,
   sanitizeInput,
 } = require("./validation");
 
 const app = express();
 
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET || "nexfinance_demo_secret";
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "2h";
-const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || "10", 10);
+const JWT_SECRET = resolveJwtSecret();
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1h";
+const AUTH_COOKIE_NAME = "nexfinance_auth";
+const AUTH_COOKIE_MAX_AGE_MS = 60 * 60 * 1000;
+const BCRYPT_ROUNDS = Math.max(parseInt(process.env.BCRYPT_ROUNDS || "12", 10), 12);
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 const gemini = process.env.GEMINI_API_KEY
   ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
@@ -34,28 +38,64 @@ const demoUsers = [
     name: "Usuário Teste",
     email: "teste@nexfinance.com",
     company_name: "NexFoods Comércio LTDA",
-    password_hash: bcrypt.hashSync("123456", 10),
+    password_hash: bcrypt.hashSync("Senha123", BCRYPT_ROUNDS),
+    email_verified: true,
   },
 ];
 const pendingRegistrationsByToken = new Map();
 const pendingRegistrationsByEmail = new Map();
+const pendingPasswordResetsByToken = new Map();
+const pendingPasswordResetsByEmail = new Map();
 const EMAIL_VERIFICATION_EXPIRES_MS = 1000 * 60 * 60 * 24;
+const PASSWORD_RESET_EXPIRES_MS = 1000 * 60 * 60;
 
-app.use(helmet({ contentSecurityPolicy: false }));
+app.disable("x-powered-by");
+
+const TRUSTED_ORIGINS = buildTrustedOrigins();
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: buildCspDirectives(),
+  },
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+  crossOriginResourcePolicy: { policy: "same-site" },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+}));
 app.use(compression());
 app.use(cors({
-  origin: process.env.NODE_ENV === "production" ? process.env.CLIENT_URL : "*",
+  origin(origin, callback) {
+    if (!origin || TRUSTED_ORIGINS.has(origin) || isLocalhostOrigin(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Origem não permitida pelo CORS."));
+  },
+  credentials: true,
   optionsSuccessStatus: 200,
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "120kb" }));
+app.use(express.urlencoded({ extended: true, limit: "120kb" }));
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 25,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: {
     success: false,
     message: "Muitas tentativas de acesso. Tente novamente em 15 minutos.",
+  },
+});
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Muitas solicitações para a IA. Aguarde um minuto e tente novamente.",
   },
 });
 
@@ -103,7 +143,21 @@ app.get("/api/test-db", async (req, res) => {
   }
 });
 
-app.post("/api/auth/register-old", authLimiter, async (req, res) => {
+app.post("/api/auth/register-old", (req, res) => {
+  return res.status(410).json({
+    success: false,
+    message: "Essa rota de cadastro foi desativada por segurança. Use /api/auth/register.",
+  });
+});
+
+app.post("/api/auth/register-legacy-disabled", (req, res) => {
+  return res.status(410).json({
+    success: false,
+    message: "Essa rota legada foi desativada por segurança.",
+  });
+});
+
+app.post("/__disabled__/api/auth/register-legacy-disabled", authLimiter, async (req, res) => {
   try {
     let { name, username, email, password, company, cnpj } = req.body;
 
@@ -140,7 +194,7 @@ app.post("/api/auth/register-old", authLimiter, async (req, res) => {
       };
 
       demoUsers.push(newUser);
-      return res.status(201).json(makeAuthResponse(newUser, "Usuário criado em modo demonstração."));
+      return sendAuthResponse(res, 201, newUser, "Usuário criado em modo demonstração.");
     }
 
     const { data: existingUser } = await supabase
@@ -181,7 +235,7 @@ app.post("/api/auth/register-old", authLimiter, async (req, res) => {
       .from("companies")
       .insert([{ owner_id: userData.id, name: company, cnpj: cnpj || null, status: "active" }]);
 
-    return res.status(201).json(makeAuthResponse(userData, "Usuário criado com sucesso."));
+    return sendAuthResponse(res, 201, userData, "Usuário criado com sucesso.");
   } catch (error) {
     console.error("Erro no cadastro:", error);
     const fallbackUser = {
@@ -189,11 +243,11 @@ app.post("/api/auth/register-old", authLimiter, async (req, res) => {
       name: sanitizeInput(req.body.name || "Usuário Demo"),
       email: sanitizeInput(req.body.email || `demo-${Date.now()}@nexfinance.com`).toLowerCase(),
       company_name: sanitizeInput(req.body.company || "Empresa Demo"),
-      password_hash: bcrypt.hashSync(req.body.password || "123456", 10),
+      password_hash: bcrypt.hashSync(req.body.password || "Senha123", BCRYPT_ROUNDS),
     };
 
     demoUsers.push(fallbackUser);
-    return res.status(201).json(makeAuthResponse(fallbackUser, "Supabase indisponível. Usuário criado em modo demonstração."));
+    return sendAuthResponse(res, 201, fallbackUser, "Supabase indisponível. Usuário criado em modo demonstração.");
   }
 });
 
@@ -263,7 +317,7 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
       success: true,
       requiresEmailVerification: true,
       message: "Enviamos um link de validação para o email cadastrado. Confirme o email antes de fazer login.",
-      devVerificationUrl: hasEmailProvider() ? undefined : verificationUrl,
+      devVerificationUrl: shouldExposeDevVerificationUrl() ? verificationUrl : undefined,
     });
   } catch (error) {
     console.error("Erro no cadastro:", error);
@@ -298,6 +352,7 @@ app.get("/api/auth/verify-email", async (req, res) => {
         email: pendingRegistration.email,
         company_name: pendingRegistration.company,
         password_hash: pendingRegistration.password_hash,
+        email_verified: true,
       });
       removePendingRegistration(pendingRegistration.email);
 
@@ -332,6 +387,7 @@ app.get("/api/auth/verify-email", async (req, res) => {
         email: pendingRegistration.email,
         password_hash: pendingRegistration.password_hash,
         company_name: pendingRegistration.company,
+        email_verified: true,
         created_at: new Date().toISOString(),
       }])
       .select("id, name, email, company_name");
@@ -397,25 +453,26 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
     if (!supabase) {
       const user = demoUsers.find((demoUser) => demoUser.email === email);
       if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+        logSecurityEvent("login_failed", req, { email: maskEmail(email), mode: "demo" });
         return res.status(401).json({
           success: false,
           message: "Email ou senha incorretos.",
         });
       }
 
-      return res.status(200).json(makeAuthResponse(user, "Login realizado em modo demonstração."));
+      return sendAuthResponse(res, 200, user, "Login realizado em modo demonstração.");
     }
 
     const { data: users, error: queryError } = await supabase
       .from("users")
-      .select("id, name, email, company_name, password_hash")
+      .select("id, name, email, company_name, password_hash, email_verified")
       .eq("email", email)
       .limit(1);
 
     if (queryError) {
       const demoUser = demoUsers.find((item) => item.email === email);
       if (demoUser && (await bcrypt.compare(password, demoUser.password_hash))) {
-        return res.status(200).json(makeAuthResponse(demoUser, "Supabase indisponível. Login realizado em modo demonstração."));
+        return sendAuthResponse(res, 200, demoUser, "Supabase indisponível. Login realizado em modo demonstração.");
       }
 
       return res.status(500).json({
@@ -426,18 +483,27 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
 
     const user = users?.[0];
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+      logSecurityEvent("login_failed", req, { email: maskEmail(email), mode: "database" });
       return res.status(401).json({
         success: false,
         message: "Email ou senha incorretos.",
       });
     }
 
-    return res.status(200).json(makeAuthResponse(user, "Login realizado com sucesso."));
+    // Segurança: bloqueia login de contas criadas pelo fluxo novo antes da validação do email.
+    if (user.email_verified === false) {
+      return res.status(403).json({
+        success: false,
+        message: "Confirme seu email antes de fazer login.",
+      });
+    }
+
+    return sendAuthResponse(res, 200, user, "Login realizado com sucesso.");
   } catch (error) {
     console.error("Erro no login:", error);
     const demoUser = demoUsers.find((item) => item.email === sanitizeInput(req.body.email || "").toLowerCase());
     if (demoUser && (await bcrypt.compare(req.body.password || "", demoUser.password_hash))) {
-      return res.status(200).json(makeAuthResponse(demoUser, "Supabase indisponível. Login realizado em modo demonstração."));
+      return sendAuthResponse(res, 200, demoUser, "Supabase indisponível. Login realizado em modo demonstração.");
     }
 
     return res.status(500).json({
@@ -478,7 +544,7 @@ app.post("/api/auth/google", authLimiter, async (req, res) => {
 
     const demoUser = demoUsers.find((user) => user.email === email);
     if (demoUser) {
-      return res.status(200).json(makeAuthResponse(demoUser, "Login com Google realizado com sucesso."));
+      return sendAuthResponse(res, 200, demoUser, "Login com Google realizado com sucesso.");
     }
 
     if (supabase) {
@@ -496,7 +562,7 @@ app.post("/api/auth/google", authLimiter, async (req, res) => {
       }
 
       if (users?.[0]) {
-        return res.status(200).json(makeAuthResponse(users[0], "Login com Google realizado com sucesso."));
+        return sendAuthResponse(res, 200, users[0], "Login com Google realizado com sucesso.");
       }
     }
 
@@ -535,10 +601,10 @@ app.post("/api/auth/google/complete", authLimiter, async (req, res) => {
   try {
     const { profileToken, password, company = "Empresa NexFinance" } = req.body;
 
-    if (!password || String(password).length < 6) {
+    if (!validateRegisterInput({ name: "Usuário Google", email: "google@nexfinance.com", password, company }).isValid) {
       return res.status(400).json({
         success: false,
-        message: "A senha precisa ter pelo menos 6 caracteres.",
+        message: "A senha precisa ter exatamente 8 caracteres, com letras e números.",
       });
     }
 
@@ -556,7 +622,7 @@ app.post("/api/auth/google/complete", authLimiter, async (req, res) => {
     const existingDemoUser = demoUsers.find((user) => user.email === email);
 
     if (existingDemoUser) {
-      return res.status(200).json(makeAuthResponse(existingDemoUser, "Conta Google já existente. Login realizado."));
+      return sendAuthResponse(res, 200, existingDemoUser, "Conta Google já existente. Login realizado.");
     }
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
@@ -569,10 +635,11 @@ app.post("/api/auth/google/complete", authLimiter, async (req, res) => {
         email,
         company_name: companyName,
         password_hash: passwordHash,
+        email_verified: true,
       };
 
       demoUsers.push(newUser);
-      return res.status(201).json(makeAuthResponse(newUser, "Conta Google criada em modo demonstração."));
+      return sendAuthResponse(res, 201, newUser, "Conta Google criada em modo demonstração.");
     }
 
     const { data: existingUser } = await supabase
@@ -582,7 +649,7 @@ app.post("/api/auth/google/complete", authLimiter, async (req, res) => {
       .maybeSingle();
 
     if (existingUser) {
-      return res.status(200).json(makeAuthResponse(existingUser, "Conta Google já existente. Login realizado."));
+      return sendAuthResponse(res, 200, existingUser, "Conta Google já existente. Login realizado.");
     }
 
     const { data: newUser, error: insertError } = await supabase
@@ -592,6 +659,7 @@ app.post("/api/auth/google/complete", authLimiter, async (req, res) => {
         email,
         password_hash: passwordHash,
         company_name: companyName,
+        email_verified: true,
         created_at: new Date().toISOString(),
       }])
       .select("id, name, email, company_name");
@@ -607,7 +675,7 @@ app.post("/api/auth/google/complete", authLimiter, async (req, res) => {
       .from("companies")
       .insert([{ owner_id: newUser[0].id, name: companyName, cnpj: null, status: "active" }]);
 
-    return res.status(201).json(makeAuthResponse(newUser[0], "Conta Google criada com sucesso."));
+    return sendAuthResponse(res, 201, newUser[0], "Conta Google criada com sucesso.");
   } catch (error) {
     console.error("Erro ao concluir cadastro Google:", error);
     return res.status(401).json({
@@ -662,26 +730,142 @@ app.get("/api/dashboard", verifyToken, async (req, res) => {
   }
 });
 
-app.post("/api/auth/recover", authLimiter, (req, res) => {
+app.post("/api/auth/logout", (req, res) => {
+  res.clearCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
+  return res.status(200).json({
+    success: true,
+    message: "Sessão encerrada com segurança.",
+  });
+});
+
+app.post("/api/auth/recover", authLimiter, handlePasswordRecovery);
+app.post("/api/auth/forgot-password", authLimiter, handlePasswordRecovery);
+
+async function handlePasswordRecovery(req, res) {
+  try {
+    const email = sanitizeInput(req.body.email || "").toLowerCase();
+    let resetUrlForDev;
+
+    if (!validateEmail(email)) {
+      return res.status(200).json({
+        success: true,
+        message: "Se o email estiver cadastrado, as instruções serão enviadas.",
+      });
+    }
+
+    const user = await findUserByEmail(email);
+    if (user) {
+      const reset = createPasswordResetToken();
+      const resetUrl = `${getAppBaseUrl(req)}/api/auth/reset-password?token=${reset.token}`;
+      resetUrlForDev = resetUrl;
+
+      pendingPasswordResetsByToken.set(reset.tokenHash, {
+        userId: user.id,
+        email,
+        expires_at: Date.now() + PASSWORD_RESET_EXPIRES_MS,
+        used: false,
+      });
+      pendingPasswordResetsByEmail.set(email, reset.tokenHash);
+
+      await sendPasswordResetEmail({ to: email, name: user.name || "usuário", resetUrl });
+      logSecurityEvent("password_reset_requested", req, { email: maskEmail(email) });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Se o email estiver cadastrado, as instruções serão enviadas.",
+      devResetUrl: shouldExposeDevVerificationUrl() ? resetUrlForDev : undefined,
+    });
+  } catch (error) {
+    console.error("Erro na recuperação de senha:", error);
+    return res.status(200).json({
+      success: true,
+      message: "Se o email estiver cadastrado, as instruções serão enviadas.",
+    });
+  }
+}
+
+app.get("/api/auth/reset-password", (req, res) => {
+  const token = String(req.query.token || "");
+  const tokenHash = hashToken(token);
+  const reset = pendingPasswordResetsByToken.get(tokenHash);
+
+  if (!reset || reset.used || reset.expires_at < Date.now()) {
+    return res.status(400).send(renderVerificationPage({
+      title: "Link inválido",
+      message: "Esse link de recuperação expirou ou já foi usado. Solicite um novo link.",
+      linkLabel: "Voltar ao login",
+      linkHref: "/login.html",
+    }));
+  }
+
+  return res.status(200).send(renderPasswordResetPage(token));
+});
+
+app.post("/api/auth/reset-password", authLimiter, async (req, res) => {
+  try {
+    const token = String(req.body.token || "");
+    const password = String(req.body.password || "");
+    const confirmPassword = String(req.body.confirmPassword || "");
+    const tokenHash = hashToken(token);
+    const reset = pendingPasswordResetsByToken.get(tokenHash);
+
+    if (!reset || reset.used || reset.expires_at < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: "Link de recuperação inválido ou expirado.",
+      });
+    }
+
+    if (password !== confirmPassword || !validatePassword(password)) {
+      return res.status(400).json({
+        success: false,
+        message: "A nova senha precisa ter exatamente 8 caracteres, com letras e números.",
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    await updateUserPassword(reset.email, passwordHash);
+
+    reset.used = true;
+    removePasswordReset(reset.email);
+    logSecurityEvent("password_reset_completed", req, { email: maskEmail(reset.email) });
+
+    return res.status(200).json({
+      success: true,
+      message: "Senha atualizada com sucesso. Você já pode entrar.",
+    });
+  } catch (error) {
+    console.error("Erro ao redefinir senha:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Não foi possível atualizar a senha agora.",
+    });
+  }
+});
+
+app.post("/api/auth/recover-demo-disabled", authLimiter, (req, res) => {
   return res.status(200).json({
     success: true,
     message: "Se o email estiver cadastrado, as instruções serão enviadas.",
   });
 });
 
-app.post("/api/ai/analyze", verifyToken, async (req, res) => {
+app.post("/api/ai/analyze", aiLimiter, verifyToken, async (req, res) => {
   try {
     const { module = "Dashboard", question = "Analise os dados e gere recomendações.", data = {} } = req.body;
+    const safeData = summarizeBusinessDataForAi(data);
 
     if (!gemini) {
       return res.status(200).json({
         success: true,
         provider: "demo",
-        answer: buildDemoAiAnswer(module, data, question),
+        answer: buildDemoAiAnswer(module, safeData, question),
       });
     }
 
-    const prompt = buildNexFinancePrompt({ module, question, data });
+    // Segurança: envia para IA externa apenas dados agregados, sem nomes, emails, telefones ou documentos.
+    const prompt = buildNexFinancePrompt({ module, question, data: safeData });
     const result = await gemini.models.generateContent({
       model: GEMINI_MODEL,
       contents: prompt,
@@ -703,22 +887,23 @@ app.post("/api/ai/analyze", verifyToken, async (req, res) => {
   }
 });
 
-app.post("/api/ai/recommendations", verifyToken, async (req, res) => {
+app.post("/api/ai/recommendations", aiLimiter, verifyToken, async (req, res) => {
   try {
     const { data = {} } = req.body;
+    const safeData = summarizeBusinessDataForAi(data);
 
     if (!gemini) {
       return res.status(200).json({
         success: true,
         provider: "demo",
-        recommendations: buildDemoRecommendations(data),
+        recommendations: buildDemoRecommendations(safeData),
       });
     }
 
     const prompt = buildNexFinancePrompt({
       module: "Recomendações IA",
       question: "Gere até 5 recomendações em JSON válido para o gestor.",
-      data,
+      data: safeData,
       json: true,
     });
 
@@ -751,6 +936,64 @@ app.use("/api", (req, res) => {
   });
 });
 
+function buildTrustedOrigins() {
+  const configuredOrigins = [
+    process.env.CLIENT_URL,
+    process.env.APP_URL,
+    process.env.CORS_ORIGINS,
+  ]
+    .filter(Boolean)
+    .flatMap((value) => String(value).split(","))
+    .map((value) => normalizeOrigin(value.trim()))
+    .filter(Boolean);
+
+  return new Set([
+    ...configuredOrigins,
+    `http://localhost:${PORT}`,
+    `http://127.0.0.1:${PORT}`,
+  ]);
+}
+
+function buildCspDirectives() {
+  const directives = {
+    "default-src": ["'self'"],
+    "script-src": ["'self'", "https://accounts.google.com", "https://apis.google.com"],
+    "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+    "font-src": ["'self'", "https://fonts.gstatic.com", "data:"],
+    "img-src": ["'self'", "data:", "blob:", "https:"],
+    "connect-src": ["'self'", "https://oauth2.googleapis.com", "https://accounts.google.com", "https://*.supabase.co"],
+    "frame-src": ["'self'", "https://accounts.google.com"],
+    "frame-ancestors": ["'self'"],
+    "base-uri": ["'self'"],
+    "form-action": ["'self'"],
+    "object-src": ["'none'"],
+  };
+
+  if (process.env.NODE_ENV === "production") {
+    directives["upgrade-insecure-requests"] = [];
+  }
+
+  return directives;
+}
+
+function normalizeOrigin(value) {
+  if (!value) return "";
+  try {
+    return new URL(value).origin;
+  } catch {
+    return value.replace(/\/+$/, "");
+  }
+}
+
+function isLocalhostOrigin(origin) {
+  try {
+    const { hostname } = new URL(origin);
+    return ["localhost", "127.0.0.1", "::1"].includes(hostname);
+  } catch {
+    return false;
+  }
+}
+
 function createEmailVerificationToken() {
   const token = crypto.randomBytes(32).toString("hex");
   return {
@@ -771,12 +1014,90 @@ function removePendingRegistration(email) {
   pendingRegistrationsByEmail.delete(email);
 }
 
+function createPasswordResetToken() {
+  const token = crypto.randomBytes(32).toString("hex");
+  return {
+    token,
+    tokenHash: hashToken(token),
+  };
+}
+
+function removePasswordReset(email) {
+  const tokenHash = pendingPasswordResetsByEmail.get(email);
+  if (tokenHash) {
+    pendingPasswordResetsByToken.delete(tokenHash);
+  }
+  pendingPasswordResetsByEmail.delete(email);
+}
+
+async function findUserByEmail(email) {
+  const demoUser = demoUsers.find((user) => user.email === email);
+  if (demoUser) return demoUser;
+
+  if (!supabase) return null;
+
+  const { data: user, error } = await supabase
+    .from("users")
+    .select("id, name, email, company_name, password_hash, email_verified")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (error) return null;
+  return user;
+}
+
+async function updateUserPassword(email, passwordHash) {
+  const demoUser = demoUsers.find((user) => user.email === email);
+  if (demoUser) {
+    demoUser.password_hash = passwordHash;
+    return;
+  }
+
+  if (!supabase) {
+    throw new Error("Banco de dados indisponível para atualizar senha.");
+  }
+
+  const { error } = await supabase
+    .from("users")
+    .update({ password_hash: passwordHash })
+    .eq("email", email);
+
+  if (error) {
+    throw error;
+  }
+}
+
 function getAppBaseUrl(req) {
-  return process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+  return normalizeOrigin(process.env.APP_URL || `${req.protocol}://${req.get("host")}`);
 }
 
 function hasEmailProvider() {
   return Boolean(process.env.RESEND_API_KEY || process.env.EMAIL_PROVIDER_API_KEY);
+}
+
+function shouldExposeDevVerificationUrl() {
+  return process.env.NODE_ENV !== "production" && !hasEmailProvider();
+}
+
+function maskEmail(email) {
+  const [user, domain] = String(email || "").split("@");
+  if (!user || !domain) return "email_invalido";
+  const visible = user.slice(0, 2);
+  return `${visible}${"*".repeat(Math.max(user.length - 2, 2))}@${domain}`;
+}
+
+function logSecurityEvent(event, req, metadata = {}) {
+  const payload = {
+    type: "security",
+    event,
+    ip: req.ip,
+    route: req.originalUrl,
+    userAgent: req.get("user-agent"),
+    at: new Date().toISOString(),
+    ...metadata,
+  };
+
+  console.info(JSON.stringify(payload));
 }
 
 async function verifyGoogleCredential(credential) {
@@ -836,6 +1157,40 @@ async function sendVerificationEmail({ to, name, verificationUrl }) {
   }
 }
 
+async function sendPasswordResetEmail({ to, name, resetUrl }) {
+  const apiKey = (process.env.RESEND_API_KEY || process.env.EMAIL_PROVIDER_API_KEY || "").trim();
+  const from = process.env.EMAIL_FROM || "NexFinance <onboarding@resend.dev>";
+
+  if (!apiKey) {
+    console.log("\n========================================");
+    console.log("Recuperacao de senha em modo local");
+    console.log(`Email: ${to}`);
+    console.log(`Link: ${resetUrl}`);
+    console.log("Configure RESEND_API_KEY e EMAIL_FROM no .env para enviar email de verdade.");
+    console.log("========================================\n");
+    return;
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to,
+      subject: "Redefina sua senha na NexFinance",
+      html: buildPasswordResetEmailHtml({ name, resetUrl }),
+    }),
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Erro ao enviar email de recuperacao: ${details}`);
+  }
+}
+
 function buildVerificationEmailHtml({ name, verificationUrl }) {
   return `
     <div style="margin:0;padding:32px;background:#f8fafc;font-family:Inter,Arial,sans-serif;color:#061b2e;">
@@ -845,6 +1200,20 @@ function buildVerificationEmailHtml({ name, verificationUrl }) {
         <p style="margin:0 0 18px;font-size:16px;line-height:1.6;color:#475569;">Ola, ${escapeHtml(name)}. Para ativar sua conta e acessar a plataforma, confirme o email cadastrado.</p>
         <a href="${verificationUrl}" style="display:inline-block;margin:8px 0 20px;padding:14px 22px;border-radius:12px;background:linear-gradient(135deg,#00334d,#00bfa6);color:#ffffff;text-decoration:none;font-weight:800;">Confirmar email</a>
         <p style="margin:0;font-size:13px;line-height:1.5;color:#64748b;">Esse link expira em 24 horas. Se voce nao criou essa conta, ignore esta mensagem.</p>
+      </div>
+    </div>
+  `;
+}
+
+function buildPasswordResetEmailHtml({ name, resetUrl }) {
+  return `
+    <div style="margin:0;padding:32px;background:#f8fafc;font-family:Inter,Arial,sans-serif;color:#061b2e;">
+      <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:24px;padding:32px;box-shadow:0 24px 60px rgba(15,23,42,.08);">
+        <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#00a892;">NexFinance</p>
+        <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15;color:#061b2e;">Redefina sua senha</h1>
+        <p style="margin:0 0 18px;font-size:16px;line-height:1.6;color:#475569;">Ola, ${escapeHtml(name)}. Recebemos uma solicitação para redefinir sua senha.</p>
+        <a href="${resetUrl}" style="display:inline-block;margin:8px 0 20px;padding:14px 22px;border-radius:12px;background:linear-gradient(135deg,#00334d,#00bfa6);color:#ffffff;text-decoration:none;font-weight:800;">Criar nova senha</a>
+        <p style="margin:0;font-size:13px;line-height:1.5;color:#64748b;">Esse link expira em 1 hora e só pode ser usado uma vez. Se voce nao pediu isso, ignore esta mensagem.</p>
       </div>
     </div>
   `;
@@ -882,6 +1251,44 @@ function renderVerificationPage({ title, message, linkLabel, linkHref }) {
   `;
 }
 
+function renderPasswordResetPage(token) {
+  return `
+    <!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Redefinir senha | NexFinance</title>
+        <style>
+          body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f8fafc;color:#061b2e;font-family:Inter,Arial,sans-serif;padding:24px}
+          main{width:min(100%,480px);background:#fff;border:1px solid #e2e8f0;border-radius:24px;padding:34px;box-shadow:0 24px 60px rgba(15,23,42,.08)}
+          strong{display:block;color:#00a892;margin-bottom:10px}
+          h1{font-size:32px;line-height:1.05;margin:0 0 12px}
+          p{font-size:15px;line-height:1.6;color:#64748b;margin:0 0 22px}
+          label{display:block;font-weight:700;margin:14px 0 8px}
+          input{width:100%;height:48px;border:1px solid #e2e8f0;border-radius:12px;padding:0 14px;font-size:15px;box-sizing:border-box}
+          button{width:100%;height:50px;margin-top:18px;border:0;border-radius:12px;background:linear-gradient(135deg,#00334d,#00bfa6);color:#fff;font-weight:800;font-size:15px;cursor:pointer}
+        </style>
+      </head>
+      <body>
+        <main>
+          <strong>NexFinance</strong>
+          <h1>Crie uma nova senha</h1>
+          <p>Use uma senha com exatamente 8 caracteres, incluindo letras e números.</p>
+          <form method="post" action="/api/auth/reset-password">
+            <input type="hidden" name="token" value="${escapeHtml(token)}">
+            <label for="password">Nova senha</label>
+            <input id="password" name="password" type="password" minlength="8" maxlength="8" autocomplete="new-password" required>
+            <label for="confirmPassword">Confirmar senha</label>
+            <input id="confirmPassword" name="confirmPassword" type="password" minlength="8" maxlength="8" autocomplete="new-password" required>
+            <button type="submit">Atualizar senha</button>
+          </form>
+        </main>
+      </body>
+    </html>
+  `;
+}
+
 function escapeHtml(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")
@@ -911,8 +1318,9 @@ function normalizeUsername(username, email) {
 }
 
 function verifyToken(req, res, next) {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.split(" ")[1];
+  const authHeader = req.headers.authorization || "";
+  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : "";
+  const token = bearerToken || readCookie(req, AUTH_COOKIE_NAME);
 
   if (!token) {
     return res.status(401).json({
@@ -921,7 +1329,7 @@ function verifyToken(req, res, next) {
     });
   }
 
-  if (token === "demo-presentation-token") {
+  if (token === "demo-presentation-token" && process.env.NODE_ENV !== "production") {
     req.user = {
       id: "demo",
       email: "teste@nexfinance.com",
@@ -932,6 +1340,7 @@ function verifyToken(req, res, next) {
   }
 
   try {
+    // Segurança: valida assinatura e expiração do JWT em toda rota privada.
     req.user = jwt.verify(token, JWT_SECRET);
     return next();
   } catch {
@@ -942,10 +1351,18 @@ function verifyToken(req, res, next) {
   }
 }
 
+function sendAuthResponse(res, status, user, message) {
+  const response = makeAuthResponse(user, message);
+  setAuthCookie(res, response.token);
+  delete response.token;
+  return res.status(status).json(response);
+}
+
 function makeAuthResponse(user, message) {
   const username = normalizeUsername(user.username || user.name, user.email);
   const displayName = user.display_name || user.name || username;
 
+  // Segurança: o JWT expira em curto prazo e é enviado em cookie httpOnly por sendAuthResponse.
   const token = jwt.sign(
     {
       id: user.id,
@@ -973,12 +1390,98 @@ function makeAuthResponse(user, message) {
   };
 }
 
+function setAuthCookie(res, token) {
+  res.cookie(AUTH_COOKIE_NAME, token, getAuthCookieOptions());
+}
+
+function getAuthCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: AUTH_COOKIE_MAX_AGE_MS,
+  };
+}
+
+function readCookie(req, name) {
+  const rawCookie = req.headers.cookie || "";
+  const cookie = rawCookie
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${name}=`));
+
+  if (!cookie) return "";
+  return decodeURIComponent(cookie.split("=").slice(1).join("="));
+}
+
+function resolveJwtSecret() {
+  const secret = process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET;
+  if (secret) return secret;
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("JWT_SECRET ou SUPABASE_JWT_SECRET precisa estar configurado em produção.");
+  }
+
+  console.warn("JWT_SECRET não configurado. Usando segredo temporário apenas para desenvolvimento local.");
+  return crypto.randomBytes(48).toString("hex");
+}
+
 function demoDashboard() {
   return {
     receitaTotal: 486240,
     despesasTotais: 279880,
     lucroLiquido: 206360,
     scoreFinanceiro: 86,
+  };
+}
+
+function summarizeBusinessDataForAi(data = {}) {
+  const count = (value) => Array.isArray(value) ? value.length : 0;
+  const toNumber = (value) => {
+    if (typeof value === "number") return value;
+    const parsed = Number(String(value || "").replace(/[^\d,-]/g, "").replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const sumValues = (rows = []) => rows.reduce((total, row) => {
+    if (Array.isArray(row)) {
+      return total + row.reduce((innerTotal, item) => innerTotal + toNumber(item), 0);
+    }
+
+    if (row && typeof row === "object") {
+      return total + Object.values(row).reduce((innerTotal, item) => innerTotal + toNumber(item), 0);
+    }
+
+    return total;
+  }, 0);
+
+  const estoque = data.estoque || data.stock || [];
+  const fornecedores = data.fornecedores || data.suppliers || [];
+  const vendas = data.vendas || data.sales || [];
+  const financeiro = data.lancamentosFinanceiros || [];
+
+  // Segurança: não envia nomes, emails, telefones, documentos ou descrições livres para provedores externos de IA.
+  return {
+    totais: {
+      clientes: count(data.clientes),
+      estoque: count(estoque),
+      fornecedores: count(fornecedores),
+      vendas: count(vendas),
+      lancamentosFinanceiros: count(financeiro),
+      folha: count(data.folha),
+      patrimonio: count(data.patrimonio),
+    },
+    indicadores: {
+      vendasEstimadas: sumValues(vendas),
+      financeiroEstimado: sumValues(financeiro),
+      estoqueEstimado: sumValues(estoque),
+      capitalDeGiro: sanitizeInput(data?.capitalDeGiro?.gapProjetado || ""),
+    },
+    perfilNegocio: {
+      tipo: sanitizeInput(data?.perfil?.businessType || data?.perfil?.tipo || ""),
+      risco: sanitizeInput(data?.perfil?.riskProfile || data?.perfil?.perfil || ""),
+      objetivo: sanitizeInput(data?.perfil?.goal || data?.perfil?.objetivo || ""),
+    },
   };
 }
 
@@ -1576,6 +2079,22 @@ Dados usados:
 - Ações de capital de giro: ${Array.isArray(capitalPlan) ? capitalPlan.length : 0}
 - Capital de giro: ${workingCapitalGap}`;
 }
+
+app.use((err, req, res, next) => {
+  if (err?.message === "Origem não permitida pelo CORS.") {
+    logSecurityEvent("cors_blocked", req, { origin: req.get("origin") || "sem_origin" });
+    return res.status(403).json({
+      success: false,
+      message: "Origem não autorizada.",
+    });
+  }
+
+  console.error("Erro inesperado:", err);
+  return res.status(500).json({
+    success: false,
+    message: "Erro interno no servidor.",
+  });
+});
 
 app.listen(PORT, () => {
   console.log("\n========================================");

@@ -31,8 +31,8 @@
       return;
     }
 
-    if (password.length < 6) {
-      showMessage("A senha precisa ter pelo menos 6 caracteres.", "error");
+    if (password.length !== 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+      showMessage("A senha precisa ter exatamente 8 caracteres, com letras e números.", "error");
       return;
     }
 
@@ -46,6 +46,7 @@
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
         },
@@ -66,7 +67,7 @@
       }
 
       localStorage.removeItem("nexfinance_token");
-      localStorage.removeItem("nexfinance_user");
+      sessionStorage.removeItem("nexfinance_user");
       showMessage(data.message || "Enviamos um link de validação para o email cadastrado.", "success");
 
       if (data.devVerificationUrl) {
