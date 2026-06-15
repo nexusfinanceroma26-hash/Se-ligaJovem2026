@@ -15,14 +15,32 @@
   "dir": "ltr",
   "icons": [
     {
-      "src": "/img/nexfinance-app-icon.png",
-      "sizes": "192x192 512x512",
+      "src": "/img/nexfinance-icon-180.png",
+      "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/img/nexfinance-app-icon.png",
-      "sizes": "192x192 512x512",
+      "src": "/img/nexfinance-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/img/nexfinance-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/img/nexfinance-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/img/nexfinance-icon-512.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
@@ -53,7 +71,7 @@
     {
       "name": "Dashboard",
       "short_name": "Dashboard",
-      "icons": [{ "src": "/img/nexfinance-app-icon.png", "sizes": "192x192", "type": "image/png" }],
+      "icons": [{ "src": "/img/nexfinance-icon-192.png", "sizes": "192x192", "type": "image/png" }],
       "url": "/dashboard.html",
       "description": "Abrir painel principal"
     },
