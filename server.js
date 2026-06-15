@@ -22,6 +22,7 @@ const {
 const app = express();
 
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET_CONFIGURED = Boolean(process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET);
 const JWT_SECRET = resolveJwtSecret();
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1h";
 const AUTH_COOKIE_NAME = "nexfinance_auth";
@@ -53,6 +54,7 @@ app.disable("x-powered-by");
 
 const TRUSTED_ORIGINS = buildTrustedOrigins();
 
+// Helmet adiciona headers de segurança como X-Frame-Options, X-Content-Type-Options e HSTS.
 app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: true,
@@ -88,6 +90,32 @@ const authLimiter = rateLimit({
   },
 });
 
+// Limiter estrito para login: reduz força bruta por IP.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: "Too many attempts. Try again in 15 minutes.",
+    message: "Muitas tentativas. Tente novamente em 15 minutos.",
+  },
+});
+
+// Limiter geral para cadastro, recuperação e verificação de email.
+const sensitiveRouteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: "Too many requests. Try again later.",
+    message: "Muitas solicitações. Tente novamente mais tarde.",
+  },
+});
+
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
@@ -98,6 +126,15 @@ const aiLimiter = rateLimit({
     message: "Muitas solicitações para a IA. Aguarde um minuto e tente novamente.",
   },
 });
+
+app.use("/api/auth/login", loginLimiter);
+app.use("/api/auth/register", sensitiveRouteLimiter);
+app.use("/api/auth/cadastro", sensitiveRouteLimiter);
+app.use("/api/auth/recover", sensitiveRouteLimiter);
+app.use("/api/auth/recuperar", sensitiveRouteLimiter);
+app.use("/api/auth/forgot-password", sensitiveRouteLimiter);
+app.use("/api/auth/reset-password", sensitiveRouteLimiter);
+app.use("/api/auth/verify-email", sensitiveRouteLimiter);
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -336,16 +373,60 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
 
     const verification = createEmailVerificationToken();
     const verificationUrl = `${getAppBaseUrl(req)}/api/auth/verify-email?token=${verification.token}`;
+    const verificationExpiresAt = new Date(Date.now() + EMAIL_VERIFICATION_EXPIRES_MS).toISOString();
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-    pendingRegistrationsByToken.set(verification.tokenHash, {
-      name,
-      username,
-      email,
-      company,
-      cnpj: cnpj || null,
-      password_hash: await bcrypt.hash(password, BCRYPT_ROUNDS),
-      expires_at: Date.now() + EMAIL_VERIFICATION_EXPIRES_MS,
-    });
+    if (!supabase) {
+      // Segurança: em modo local a conta também nasce não verificada até o link ser usado.
+      demoUsers.push({
+        id: `demo-${Date.now()}`,
+        name: username || name,
+        full_name: name,
+        username,
+        email,
+        company_name: company,
+        password_hash: passwordHash,
+        emailVerified: false,
+        email_verified: false,
+        emailVerificationToken: verification.tokenHash,
+        email_verification_token_hash: verification.tokenHash,
+        emailVerificationExpires: verificationExpiresAt,
+        email_verification_expires_at: verificationExpiresAt,
+        cnpj: cnpj || null,
+      });
+    } else {
+      const { data: newUser, error: insertError } = await supabase
+        .from("users")
+        .insert([{
+          name: username || name,
+          email,
+          password_hash: passwordHash,
+          company_name: company,
+          email_verified: false,
+          email_verification_token_hash: verification.tokenHash,
+          email_verification_expires_at: verificationExpiresAt,
+          created_at: new Date().toISOString(),
+        }])
+        .select("id, name, email, company_name")
+        .single();
+
+      if (insertError || !newUser) {
+        return res.status(500).json({
+          success: false,
+          message: "Erro ao criar usuário para validação por email.",
+        });
+      }
+
+      await supabase
+        .from("companies")
+        .insert([{
+          owner_id: newUser.id,
+          name: company,
+          cnpj: cnpj || null,
+          status: "pending_email_verification",
+        }]);
+    }
+
     pendingRegistrationsByEmail.set(email, verification.tokenHash);
 
     await sendVerificationEmail({ to: email, name, verificationUrl });
@@ -369,29 +450,35 @@ app.get("/api/auth/verify-email", async (req, res) => {
   try {
     const token = String(req.query.token || "");
     const tokenHash = hashToken(token);
-    const pendingRegistration = pendingRegistrationsByToken.get(tokenHash);
 
-    if (!pendingRegistration || pendingRegistration.expires_at < Date.now()) {
+    if (!token) {
       return res.status(400).send(renderVerificationPage({
-        title: "Link expirado",
-        message: "Esse link de validação expirou ou já foi usado. Crie a conta novamente para receber um novo link.",
+        title: "Link inválido",
+        message: "Esse link de validação não é válido. Solicite um novo cadastro.",
         linkLabel: "Voltar ao cadastro",
         linkHref: "/cadastro.html",
       }));
     }
 
     if (!supabase) {
-      demoUsers.push({
-        id: `demo-${Date.now()}`,
-        name: pendingRegistration.username || pendingRegistration.name,
-        full_name: pendingRegistration.name,
-        username: pendingRegistration.username,
-        email: pendingRegistration.email,
-        company_name: pendingRegistration.company,
-        password_hash: pendingRegistration.password_hash,
-        email_verified: true,
-      });
-      removePendingRegistration(pendingRegistration.email);
+      const demoUser = demoUsers.find((user) => user.emailVerificationToken === tokenHash || user.email_verification_token_hash === tokenHash);
+      if (!demoUser || new Date(demoUser.emailVerificationExpires || demoUser.email_verification_expires_at).getTime() < Date.now()) {
+        return res.status(400).send(renderVerificationPage({
+          title: "Link expirado",
+          message: "Esse link de validação expirou ou já foi usado. Crie a conta novamente para receber um novo link.",
+          linkLabel: "Voltar ao cadastro",
+          linkHref: "/cadastro.html",
+        }));
+      }
+
+      demoUser.emailVerified = true;
+      demoUser.email_verified = true;
+      demoUser.email_verified_at = new Date().toISOString();
+      delete demoUser.emailVerificationToken;
+      delete demoUser.email_verification_token_hash;
+      delete demoUser.emailVerificationExpires;
+      delete demoUser.email_verification_expires_at;
+      removePendingRegistration(demoUser.email);
 
       return res.status(200).send(renderVerificationPage({
         title: "Email confirmado",
@@ -401,53 +488,46 @@ app.get("/api/auth/verify-email", async (req, res) => {
       }));
     }
 
-    const { data: existingUser } = await supabase
+    const { data: user, error: userError } = await supabase
       .from("users")
-      .select("id")
-      .eq("email", pendingRegistration.email)
+      .select("id, email, email_verified, email_verification_expires_at")
+      .eq("email_verification_token_hash", tokenHash)
       .maybeSingle();
 
-    if (existingUser) {
-      removePendingRegistration(pendingRegistration.email);
-      return res.status(200).send(renderVerificationPage({
-        title: "Email já confirmado",
-        message: "Essa conta já está ativa. Entre com seu email e senha.",
-        linkLabel: "Ir para o login",
-        linkHref: "/login.html?verified=1",
-      }));
-    }
-
-    const { data: newUser, error: insertError } = await supabase
-      .from("users")
-      .insert([{
-        name: pendingRegistration.username || pendingRegistration.name,
-        email: pendingRegistration.email,
-        password_hash: pendingRegistration.password_hash,
-        company_name: pendingRegistration.company,
-        email_verified: true,
-        created_at: new Date().toISOString(),
-      }])
-      .select("id, name, email, company_name");
-
-    if (insertError || !newUser?.length) {
-      return res.status(500).send(renderVerificationPage({
-        title: "Erro ao criar conta",
-        message: "Não foi possível ativar sua conta agora. Tente novamente em instantes.",
+    if (userError || !user || new Date(user.email_verification_expires_at).getTime() < Date.now()) {
+      return res.status(400).send(renderVerificationPage({
+        title: "Link expirado",
+        message: "Esse link de validação expirou ou já foi usado. Crie a conta novamente para receber um novo link.",
         linkLabel: "Voltar ao cadastro",
         linkHref: "/cadastro.html",
       }));
     }
 
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({
+        email_verified: true,
+        email_verified_at: new Date().toISOString(),
+        email_verification_token_hash: null,
+        email_verification_expires_at: null,
+      })
+      .eq("id", user.id);
+
+    if (updateError) {
+      return res.status(500).send(renderVerificationPage({
+        title: "Erro ao confirmar email",
+        message: "Não foi possível ativar sua conta agora. Tente novamente em instantes.",
+        linkLabel: "Voltar ao login",
+        linkHref: "/login.html",
+      }));
+    }
+
     await supabase
       .from("companies")
-      .insert([{
-        owner_id: newUser[0].id,
-        name: pendingRegistration.company,
-        cnpj: pendingRegistration.cnpj,
-        status: "active",
-      }]);
+      .update({ status: "active" })
+      .eq("owner_id", user.id);
 
-    removePendingRegistration(pendingRegistration.email);
+    removePendingRegistration(user.email);
     return res.status(200).send(renderVerificationPage({
       title: "Email confirmado",
       message: "Sua conta foi validada com sucesso. Agora você já pode entrar na NexFinance.",
@@ -612,6 +692,8 @@ app.post("/api/auth/google", authLimiter, async (req, res) => {
       }
     }
 
+    if (!ensureJwtSecretConfigured(res)) return;
+
     const profileToken = jwt.sign(
       {
         purpose: "google_signup",
@@ -646,6 +728,8 @@ app.post("/api/auth/google", authLimiter, async (req, res) => {
 app.post("/api/auth/google/complete", authLimiter, async (req, res) => {
   try {
     const { profileToken, password, company = "Empresa NexFinance" } = req.body;
+
+    if (!ensureJwtSecretConfigured(res)) return;
 
     if (!validateRegisterInput({ name: "Usuário Google", email: "google@nexfinance.com", password, company }).isValid) {
       return res.status(400).json({
@@ -682,6 +766,7 @@ app.post("/api/auth/google/complete", authLimiter, async (req, res) => {
         company_name: companyName,
         password_hash: passwordHash,
         email_verified: true,
+        email_verified_at: new Date().toISOString(),
       };
 
       demoUsers.push(newUser);
@@ -706,6 +791,7 @@ app.post("/api/auth/google/complete", authLimiter, async (req, res) => {
         password_hash: passwordHash,
         company_name: companyName,
         email_verified: true,
+        email_verified_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
       }])
       .select("id, name, email, company_name");
@@ -1139,6 +1225,11 @@ function maskEmail(email) {
   return `${visible}${"*".repeat(Math.max(user.length - 2, 2))}@${domain}`;
 }
 
+function isUserEmailVerified(user = {}) {
+  if (user.email_verified === false || user.emailVerified === false) return false;
+  return true;
+}
+
 function logSecurityEvent(event, req, metadata = {}) {
   const payload = {
     type: "security",
@@ -1392,6 +1483,8 @@ function verifyToken(req, res, next) {
     return next();
   }
 
+  if (!ensureJwtSecretConfigured(res)) return;
+
   try {
     // Segurança: valida assinatura e expiração do JWT em toda rota privada.
     req.user = jwt.verify(token, JWT_SECRET);
@@ -1405,6 +1498,8 @@ function verifyToken(req, res, next) {
 }
 
 function sendAuthResponse(res, status, user, message) {
+  if (!ensureJwtSecretConfigured(res)) return;
+
   const response = makeAuthResponse(user, message);
   setAuthCookie(res, response.token);
   delete response.token;
@@ -1473,11 +1568,21 @@ function resolveJwtSecret() {
   if (secret) return secret;
 
   if (process.env.NODE_ENV === "production") {
-    throw new Error("JWT_SECRET ou SUPABASE_JWT_SECRET precisa estar configurado em produção.");
+    console.error("JWT_SECRET ou SUPABASE_JWT_SECRET precisa estar configurado em produção.");
+    return "nexfinance_missing_jwt_secret_configure_vercel_env";
   }
 
   console.warn("JWT_SECRET não configurado. Usando segredo temporário apenas para desenvolvimento local.");
   return crypto.randomBytes(48).toString("hex");
+}
+
+function ensureJwtSecretConfigured(res) {
+  if (JWT_SECRET_CONFIGURED || process.env.NODE_ENV !== "production") return true;
+
+  return res.status(500).json({
+    success: false,
+    message: "Configuração de autenticação ausente no servidor.",
+  });
 }
 
 function demoDashboard() {
@@ -2149,12 +2254,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log("\n========================================");
-  console.log("Servidor NexFinance rodando");
-  console.log(`URL: http://localhost:${PORT}`);
-  console.log(`Ambiente: ${process.env.NODE_ENV || "development"}`);
-  console.log(`Banco: ${supabase ? "Supabase" : "Demonstração local"}`);
-  console.log("========================================\n");
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log("\n========================================");
+    console.log("Servidor NexFinance rodando");
+    console.log(`URL: http://localhost:${PORT}`);
+    console.log(`Ambiente: ${process.env.NODE_ENV || "development"}`);
+    console.log(`Banco: ${supabase ? "Supabase" : "Demonstração local"}`);
+    console.log("========================================\n");
+  });
+}
+
+module.exports = app;
 

@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = "nexfinance-pwa-v11-security";
+﻿const CACHE_NAME = "nexfinance-pwa-v12-ios-android";
 const APP_SHELL = [
   "/",
   "/login.html",
@@ -18,6 +18,9 @@ const APP_SHELL = [
   "/pwa.js",
   "/manifest.webmanifest",
   "/img/nexfinance-app-icon.png",
+  "/img/nexfinance-icon-180.png",
+  "/img/nexfinance-icon-192.png",
+  "/img/nexfinance-icon-512.png",
   "/img/LOGO-NEX.png.png",
   "/img/Mascote-png.png"
 ];
@@ -81,6 +84,7 @@ self.addEventListener("fetch", (event) => {
     })),
   );
 });
+
 
 
 

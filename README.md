@@ -1,10 +1,10 @@
-# 🚀 NexFinance - Plataforma de Gestão Financeira Inteligente
+#  NexFinance - Plataforma de Gestão Financeira Inteligente
 
-> **Status**: ✅ Integração Supabase Completa | 🎯 Pronto para Configuração
+> **Status**:  Integração Supabase Completa |  Pronto para Configuração
 
 ---
 
-## 📊 O que é NexFinance?
+##  O que é NexFinance?
 
 NexFinance é uma plataforma SaaS de gestão financeira que centraliza dados de empresas e fornece insights com IA. Construída com:
 
@@ -16,12 +16,12 @@ NexFinance é uma plataforma SaaS de gestão financeira que centraliza dados de 
 
 ---
 
-## ⚡ Início Rápido
+##  Início Rápido
 
 ### Pré-requisitos
-- ✅ Node.js instalado
-- ✅ Projeto criado no Supabase
-- ✅ npm install já realizado
+-  Node.js instalado
+-  Projeto criado no Supabase
+-  npm install já realizado
 
 ### Setup (5 minutos)
 

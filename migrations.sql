@@ -15,6 +15,12 @@ CREATE TABLE IF NOT EXISTS users (
   company_name VARCHAR(150),
   role VARCHAR(50) DEFAULT 'owner', -- 'owner', 'admin', 'user'
   status VARCHAR(50) DEFAULT 'active', -- 'active', 'inactive', 'suspended'
+  email_verified BOOLEAN NOT NULL DEFAULT false,
+  email_verified_at TIMESTAMP,
+  email_verification_token_hash VARCHAR(255),
+  email_verification_expires_at TIMESTAMP,
+  password_reset_token_hash VARCHAR(255),
+  password_reset_expires_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_login TIMESTAMP,
@@ -105,6 +111,8 @@ CREATE TABLE IF NOT EXISTS products (
 
 -- ===== ÍNDICES PARA PERFORMANCE =====
 CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_email_verified ON users(email_verified);
+CREATE INDEX idx_users_email_verification_token_hash ON users(email_verification_token_hash);
 CREATE INDEX idx_companies_owner_id ON companies(owner_id);
 CREATE INDEX idx_customers_company_id ON customers(company_id);
 CREATE INDEX idx_suppliers_company_id ON suppliers(company_id);
