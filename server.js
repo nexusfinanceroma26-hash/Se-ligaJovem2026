@@ -22,6 +22,7 @@ const {
 const app = express();
 
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET_CONFIGURED = Boolean(process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET);
 const JWT_SECRET = resolveJwtSecret();
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1h";
 const AUTH_COOKIE_NAME = "nexfinance_auth";
@@ -645,6 +646,8 @@ app.post("/api/auth/google", authLimiter, async (req, res) => {
       }
     }
 
+    if (!ensureJwtSecretConfigured(res)) return;
+
     const profileToken = jwt.sign(
       {
         purpose: "google_signup",
@@ -679,6 +682,8 @@ app.post("/api/auth/google", authLimiter, async (req, res) => {
 app.post("/api/auth/google/complete", authLimiter, async (req, res) => {
   try {
     const { profileToken, password, company = "Empresa NexFinance" } = req.body;
+
+    if (!ensureJwtSecretConfigured(res)) return;
 
     if (!validateRegisterInput({ name: "Usuário Google", email: "google@nexfinance.com", password, company }).isValid) {
       return res.status(400).json({
@@ -1425,6 +1430,8 @@ function verifyToken(req, res, next) {
     return next();
   }
 
+  if (!ensureJwtSecretConfigured(res)) return;
+
   try {
     // Segurança: valida assinatura e expiração do JWT em toda rota privada.
     req.user = jwt.verify(token, JWT_SECRET);
@@ -1438,6 +1445,8 @@ function verifyToken(req, res, next) {
 }
 
 function sendAuthResponse(res, status, user, message) {
+  if (!ensureJwtSecretConfigured(res)) return;
+
   const response = makeAuthResponse(user, message);
   setAuthCookie(res, response.token);
   delete response.token;
@@ -1506,11 +1515,21 @@ function resolveJwtSecret() {
   if (secret) return secret;
 
   if (process.env.NODE_ENV === "production") {
-    throw new Error("JWT_SECRET ou SUPABASE_JWT_SECRET precisa estar configurado em produção.");
+    console.error("JWT_SECRET ou SUPABASE_JWT_SECRET precisa estar configurado em produção.");
+    return "nexfinance_missing_jwt_secret_configure_vercel_env";
   }
 
   console.warn("JWT_SECRET não configurado. Usando segredo temporário apenas para desenvolvimento local.");
   return crypto.randomBytes(48).toString("hex");
+}
+
+function ensureJwtSecretConfigured(res) {
+  if (JWT_SECRET_CONFIGURED || process.env.NODE_ENV !== "production") return true;
+
+  return res.status(500).json({
+    success: false,
+    message: "Configuração de autenticação ausente no servidor.",
+  });
 }
 
 function demoDashboard() {
@@ -2182,12 +2201,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log("\n========================================");
-  console.log("Servidor NexFinance rodando");
-  console.log(`URL: http://localhost:${PORT}`);
-  console.log(`Ambiente: ${process.env.NODE_ENV || "development"}`);
-  console.log(`Banco: ${supabase ? "Supabase" : "Demonstração local"}`);
-  console.log("========================================\n");
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log("\n========================================");
+    console.log("Servidor NexFinance rodando");
+    console.log(`URL: http://localhost:${PORT}`);
+    console.log(`Ambiente: ${process.env.NODE_ENV || "development"}`);
+    console.log(`Banco: ${supabase ? "Supabase" : "Demonstração local"}`);
+    console.log("========================================\n");
+  });
+}
+
+module.exports = app;
 
