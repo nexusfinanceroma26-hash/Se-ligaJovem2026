@@ -67,7 +67,7 @@ app.use(helmet({
 app.use(compression());
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || TRUSTED_ORIGINS.has(origin) || isLocalhostOrigin(origin)) {
+    if (!origin || TRUSTED_ORIGINS.has(origin) || isLocalhostOrigin(origin) || isVercelProjectOrigin(origin)) {
       return callback(null, true);
     }
 
@@ -1088,6 +1088,8 @@ function buildTrustedOrigins() {
 
   return new Set([
     ...configuredOrigins,
+    "https://d-cio-dacio-soares-projects.vercel.app",
+    "https://d-o4k1xgv9r-dacio-soares-projects.vercel.app",
     `http://localhost:${PORT}`,
     `http://127.0.0.1:${PORT}`,
   ]);
@@ -1128,6 +1130,20 @@ function isLocalhostOrigin(origin) {
   try {
     const { hostname } = new URL(origin);
     return ["localhost", "127.0.0.1", "::1"].includes(hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isVercelProjectOrigin(origin) {
+  try {
+    const { protocol, hostname } = new URL(origin);
+    if (protocol !== "https:" || !hostname.endsWith(".vercel.app")) return false;
+
+    return (
+      hostname === "d-cio-dacio-soares-projects.vercel.app" ||
+      /^d-[a-z0-9]+-dacio-soares-projects\.vercel\.app$/.test(hostname)
+    );
   } catch {
     return false;
   }
