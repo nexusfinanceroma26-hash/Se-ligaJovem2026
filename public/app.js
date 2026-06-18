@@ -23,6 +23,19 @@ const state = {
   user: readUser(),
 };
 
+const emptyRows = {
+  customers: [],
+  suppliers: [],
+  stock: [],
+  sales: [],
+  marketplace: [],
+  financial: [],
+  capital: [],
+  payroll: [],
+  assets: [],
+  investors: [],
+};
+
 const menu = [
   ["Gestão", [
     ["dashboard", "Visão Geral", "⌂"],
@@ -117,7 +130,7 @@ const seedRows = {
   ],
 };
 
-const rows = loadDatabase(seedRows);
+const rows = loadDatabase(emptyRows);
 
 const pageInfo = {
   stock: ["Estoque", "Produtos, mínimo ideal, ruptura, giro e previsão de demanda.", ["SKU", "Produto", "Qtd", "Mínimo", "Preço", "Status"]],
@@ -352,7 +365,7 @@ function topbar() {
       }),
     ]),
     el("div", { class: "top-actions" }, [
-      pill("Modo apresentação", "info"),
+      pill("Operação real", "ok"),
       btn("Nova ação", "+", true, () => openDrawer("Nova ação")),
       el("button", { class: "btn danger", onclick: logout }, ["Sair"]),
     ]),
@@ -381,16 +394,22 @@ function head(title, subtitle, actions = []) {
 }
 
 function dashboard() {
+  const empty = isBusinessDataEmpty();
+
   return el("div", { class: "grid" }, [
-    head("Visão geral", "Indicadores, alertas e ações prioritárias para apresentar o NexFinance.", [
-      btn("Exportar", "⇩", false, () => downloadExecutiveReport()),
+    head("Visão geral", empty ? "Comece cadastrando os dados reais da sua loja para a IA montar os indicadores." : "Indicadores, alertas e ações prioritárias da sua empresa.", [
+      btn("Baixar PDF", "⇩", false, () => downloadExecutiveReportPdf()),
       btn("Analisar empresa", "✦", true, () => go("assistant")),
     ]),
-    presentationGuide(),
+    empty ? onboardingPanel() : operationsOverviewPanel(),
     el("div", { class: "grid cols-4" }, getKpis().map(metric)),
     el("div", { class: "split" }, [
       panel("Fluxo de caixa mensal", chartNode(), "Receitas e despesas consolidadas por mês."),
-      panel("Alertas inteligentes", list([
+      panel("Alertas inteligentes", empty ? list([
+        ["Dados da loja", "Cadastre vendas, estoque, fornecedores e contas para ativar recomendações.", pill("Início", "info")],
+        ["Notas de compra", "Use o financeiro para lançar contas a pagar enquanto a importação automática é preparada.", pill("Próximo passo", "warn")],
+        ["IA", "A análise fica mais precisa conforme você adiciona registros reais.", pill("Aguardando dados", "ok")],
+      ]) : list([
         ["Ruptura iminente", "SKU CAF-001 deve acabar em 6 dias.", pill("Crítico", "bad")],
         ["Capital de giro", "Necessidade estimada de R$ 38.400 em 21 dias.", pill("Atenção", "warn")],
         ["Fornecedor Alpha", "Nova cotação pode reduzir custos em 7,8%.", pill("Oportunidade", "ok")],
@@ -400,6 +419,23 @@ function dashboard() {
       moduleCard("Estoque inteligente", "Dois produtos estão abaixo do mínimo e precisam de reposição.", "Abrir estoque", "stock"),
       moduleCard("Cotações de fornecedores", "Compare preço, prazo e confiabilidade antes de comprar.", "Ver fornecedores", "suppliers"),
       moduleCard("Folha de pagamento", "Gere valores por funcionário e acompanhe custo total.", "Abrir folha", "payroll"),
+    ]),
+  ]);
+}
+
+function onboardingPanel() {
+  return el("section", { class: "presentation-guide" }, [
+    el("div", {}, [
+      el("span", { class: "status info" }, ["Primeiro acesso"]),
+      el("h2", {}, ["Sua visão geral começa zerada"]),
+      el("p", {}, ["Cadastre os dados da loja para o NexFinance calcular receita, despesas, lucro, estoque e contas a pagar com base em informações reais."]),
+    ]),
+    el("div", { class: "guide-steps" }, [
+      guideStep("1", "Vendas", "Registre as primeiras vendas.", "sales"),
+      guideStep("2", "Financeiro", "Inclua contas a pagar e receber.", "financial"),
+      guideStep("3", "Estoque", "Cadastre produtos e mínimos.", "stock"),
+      guideStep("4", "Fornecedores", "Adicione cotações e prazos.", "suppliers"),
+      guideStep("5", "IA", "Peça recomendações com dados reais.", "assistant"),
     ]),
   ]);
 }
@@ -414,8 +450,10 @@ function metric(item) {
 }
 
 function chartNode() {
+  const currentChart = isBusinessDataEmpty() ? chart.map(([label]) => [label, 0, 0]) : chart;
+
   return el("div", {}, [
-    el("div", { class: "chart" }, chart.map(([label, revenue, cost]) => el("div", { class: "bar" }, [
+    el("div", { class: "chart" }, currentChart.map(([label, revenue, cost]) => el("div", { class: "bar" }, [
       el("i", { style: `height:${revenue * 2}px` }),
       el("b", { style: `height:${cost * 2}px` }),
       el("label", {}, [label]),
@@ -424,19 +462,19 @@ function chartNode() {
   ]);
 }
 
-function presentationGuide() {
+function operationsOverviewPanel() {
   return el("section", { class: "presentation-guide" }, [
     el("div", {}, [
-      el("span", { class: "status info" }, ["Roteiro para banca"]),
-      el("h2", {}, ["Demonstração em 5 passos"]),
-      el("p", {}, ["Mostre o problema, cadastre um dado, veja a IA reagir e exporte um relatório. Esse fluxo prova o valor do NexFinance em poucos minutos."]),
+      el("span", { class: "status info" }, ["Rotina do negócio"]),
+      el("h2", {}, ["Acompanhamento diário da loja"]),
+      el("p", {}, ["Registre dados reais, acompanhe caixa, evite falta de produto e use a IA para priorizar as próximas decisões do negócio."]),
     ]),
     el("div", { class: "guide-steps" }, [
-      guideStep("1", "Visão geral", "Mostre score, caixa e alertas.", "dashboard"),
-      guideStep("2", "Estoque", "Cadastre um produto em risco.", "stock"),
-      guideStep("3", "Fornecedores", "Compare prazo, score e cotação.", "suppliers"),
-      guideStep("4", "IA", "Explique a recomendação.", "recommendations"),
-      guideStep("5", "Relatório", "Baixe o resumo executivo.", "reports"),
+      guideStep("1", "Vendas", "Atualize as entradas do dia.", "sales"),
+      guideStep("2", "Financeiro", "Revise contas a pagar e receber.", "financial"),
+      guideStep("3", "Estoque", "Confira produtos abaixo do mínimo.", "stock"),
+      guideStep("4", "Fornecedores", "Compare preço, prazo e cotação.", "suppliers"),
+      guideStep("5", "IA", "Peça uma análise dos dados atuais.", "recommendations"),
     ]),
   ]);
 }
@@ -454,8 +492,8 @@ function dataPage(key) {
   return el("div", { class: "grid" }, [
     head(title, subtitle, [
       btn("Novo registro", "+", true, () => openDrawer(`Novo ${title}`, key)),
-      btn("Importar CSV", "⇧", false, () => toast("Importação simulada com sucesso.")),
-      btn("Exportar", "⇩", false, () => downloadCsv(title, headers, rows[key])),
+      btn("Importar planilha", "⇧", false, () => toast("Importação de planilha registrada.")),
+      btn("Baixar planilha", "⇩", false, () => downloadSpreadsheet(title, headers, rows[key])),
     ]),
     tabs(["Todos", "Críticos", "IA sugeriu ação", "Arquivados"]),
     tablePanel(title, headers, rows[key], key),
@@ -540,7 +578,11 @@ function recommendations() {
 
 function reports() {
   return el("div", { class: "grid" }, [
-    head("Relatórios", "PDF, planilhas e visão executiva para apresentação.", [btn("Baixar relatório", "⇩", true, () => downloadExecutiveReport()), btn("Agendar envio", "▷", false, () => openDrawer("Agendar relatório", "reports"))]),
+    head("Relatórios", "PDF, planilhas e visão executiva para acompanhar a empresa.", [
+      btn("Baixar PDF", "⇩", true, () => downloadExecutiveReportPdf()),
+      btn("Baixar planilha", "▦", false, () => downloadAllSpreadsheets()),
+      btn("Agendar envio", "▷", false, () => openDrawer("Agendar relatório", "reports")),
+    ]),
     el("div", { class: "kanban" }, [
       lane("Prontos", ["DRE gerencial - Maio", "Fluxo de caixa 30 dias", "Estoque crítico"]),
       lane("Agendados", ["Análise semanal IA", "LGPD mensal", "Marketplace performance"]),
@@ -552,7 +594,6 @@ function reports() {
 function settings() {
   return el("div", { class: "grid" }, [
     head("Configurações", "Empresa, usuários, permissões e preferências da plataforma.", [
-      btn("Restaurar demo", "↻", false, resetDemoData),
       btn("Salvar alterações", "✓", true, () => toast("Configurações salvas.")),
     ]),
     el("div", { class: "grid cols-2" }, [
@@ -658,14 +699,14 @@ function drawer() {
       el("h2", {}, [state.drawer || "Ação"]),
       el("button", { class: "btn icon", onclick: closeDrawer, "aria-label": "Fechar" }, ["×"]),
     ]),
-    el("div", { class: "form", id: "drawerForm" }, [
+    el("form", { class: "form", id: "drawerForm", onsubmit: saveDrawerRecord }, [
       ...(schema ? schema.fields.map(([name, label, placeholder]) => schemaField(route, name, label, placeholder, values[name])) : [
         field("Nome", "text", ""),
         field("Categoria", "text", ""),
         field("Valor", "text", ""),
         el("div", { class: "field" }, [el("label", {}, ["Observações"]), el("textarea", { name: "notes", placeholder: "Detalhe a ação..." })]),
       ]),
-      el("button", { class: "btn primary", onclick: saveDrawerRecord }, [state.editingIndex != null ? "Salvar alterações" : "Salvar"]),
+      el("button", { class: "btn primary", type: "submit" }, [state.editingIndex != null ? "Salvar alterações" : "Salvar"]),
     ]),
   ]);
 }
@@ -845,7 +886,7 @@ function initials(name = "Usuário Teste") {
 
 function loadDatabase(seed) {
   try {
-    const saved = JSON.parse(localStorage.getItem("nexfinance_demo_database") || "null");
+    const saved = JSON.parse(localStorage.getItem(getDatabaseKey()) || "null");
     return saved || structuredClone(seed);
   } catch {
     return JSON.parse(JSON.stringify(seed));
@@ -853,7 +894,12 @@ function loadDatabase(seed) {
 }
 
 function saveDatabase() {
-  localStorage.setItem("nexfinance_demo_database", JSON.stringify(rows));
+  localStorage.setItem(getDatabaseKey(), JSON.stringify(rows));
+}
+
+function getDatabaseKey() {
+  const identifier = state?.user?.id || state?.user?.email || "guest";
+  return `nexfinance_database_${String(identifier).toLowerCase()}`;
 }
 
 function saveDrawerRecord(event) {
@@ -867,7 +913,7 @@ function saveDrawerRecord(event) {
 
   if (!schema) {
     closeDrawer();
-    toast("Ação registrada para apresentação.");
+    toast("Ação registrada.");
     return;
   }
 
@@ -925,17 +971,22 @@ function getKpis() {
     .filter((row) => String(row[2]).toLowerCase().includes("despesa"))
     .reduce((total, row) => total + parseMoney(row[3]), 0);
   const stockRisk = rows.stock.filter((row) => String(row[5]).toLowerCase().includes("ruptura")).length;
-  const expenses = payrollTotal + financialExpense + 84200;
-  const revenue = Math.max(salesTotal * 18 + financialRevenue, 486240);
+  const expenses = payrollTotal + financialExpense;
+  const revenue = salesTotal + financialRevenue;
   const profit = revenue - expenses;
-  const score = Math.max(62, Math.min(96, 88 - stockRisk * 4 + (profit > 0 ? 2 : -10)));
+  const hasData = !isBusinessDataEmpty();
+  const score = hasData ? Math.max(35, Math.min(96, 78 - stockRisk * 4 + (profit > 0 ? 8 : -10))) : 0;
 
   return [
-    { label: "Receita total", value: money.format(revenue), delta: "+12,4%", help: "Vendas e marketplace consolidados", progress: 78 },
-    { label: "Despesas", value: money.format(expenses), delta: "-3,1%", help: "Custos operacionais e folha", progress: 54 },
-    { label: "Lucro líquido", value: money.format(profit), delta: profit >= 0 ? "+18,9%" : "-8,2%", help: "Resultado estimado do mês", progress: profit >= 0 ? 67 : 38 },
-    { label: "Score financeiro", value: `${score}/100`, delta: `${stockRisk ? "-" : "+"}${stockRisk || 5} pts`, help: "Impacto de caixa, estoque e margem", progress: score },
+    { label: "Receita total", value: money.format(revenue), delta: hasData ? "Atual" : "0%", help: hasData ? "Vendas e marketplace consolidados" : "Cadastre vendas para calcular", progress: hasData ? Math.min(92, Math.max(12, revenue / 1000)) : 0 },
+    { label: "Despesas", value: money.format(expenses), delta: hasData ? "Atual" : "0%", help: hasData ? "Custos operacionais e folha" : "Inclua contas a pagar", progress: hasData ? Math.min(92, Math.max(12, expenses / 1000)) : 0 },
+    { label: "Lucro líquido", value: money.format(profit), delta: hasData ? (profit >= 0 ? "Positivo" : "Negativo") : "0%", help: hasData ? "Resultado estimado do mês" : "Aguardando dados", progress: hasData ? (profit >= 0 ? 67 : 38) : 0 },
+    { label: "Score financeiro", value: hasData ? `${score}/100` : "0/100", delta: hasData ? `${stockRisk ? "-" : "+"}${stockRisk || 0} pts` : "0 pts", help: hasData ? "Impacto de caixa, estoque e margem" : "Ativa após registros", progress: score },
   ];
+}
+
+function isBusinessDataEmpty() {
+  return ["customers", "suppliers", "stock", "sales", "marketplace", "financial", "payroll", "assets"].every((key) => !rows[key]?.length);
 }
 
 function sumRows(data, index) {
@@ -970,29 +1021,56 @@ function calculateWorkingCapitalGap() {
   return Math.max(0, payable + stockReplacement - receivable);
 }
 
-function downloadCsv(title, headers, data) {
-  const rowsToExport = [headers, ...data];
-  const csv = rowsToExport
-    .map((row) => row.map((item) => `"${String(item).replace(/"/g, '""')}"`).join(";"))
-    .join("\n");
-
-  downloadFile(`${slug(title)}.csv`, `\ufeff${csv}`, "text/csv;charset=utf-8");
-  toast(`${title} exportado em CSV.`);
+function downloadSpreadsheet(title, headers, data) {
+  const html = buildSpreadsheetHtml([{ title, headers, data }]);
+  downloadFile(`${slug(title)}.xls`, html, "application/vnd.ms-excel;charset=utf-8");
+  toast(`${title} baixado em planilha.`);
 }
 
-function downloadExecutiveReport() {
+function downloadAllSpreadsheets() {
+  const sheets = Object.entries(pageInfo).map(([key, [title, , headers]]) => ({
+    title,
+    headers,
+    data: rows[key] || [],
+  }));
+
+  sheets.unshift({
+    title: "Indicadores",
+    headers: ["Indicador", "Valor", "Variação", "Observação"],
+    data: getKpis().map((item) => [item.label, item.value, item.delta, item.help]),
+  });
+
+  const html = buildSpreadsheetHtml(sheets);
+  downloadFile("dados-nexfinance.xls", html, "application/vnd.ms-excel;charset=utf-8");
+  toast("Dados baixados em planilha.");
+}
+
+function downloadExecutiveReportPdf() {
   const recommendations = buildSmartRecommendations();
-  const content = [
+  const lines = [
     "Relatório Executivo NexFinance",
+    `Gerado em ${new Date().toLocaleDateString("pt-BR")}`,
     "",
+    "Indicadores principais:",
     ...getKpis().map((item) => `${item.label}: ${item.value} (${item.delta})`),
     "",
     "Recomendações principais:",
     ...recommendations.map((item) => `- ${item[1]} Impacto estimado: ${item[2]}. Risco: ${item[3]}.`),
-  ].join("\n");
+    "",
+    "Resumo dos dados cadastrados:",
+    `Clientes: ${rows.customers.length}`,
+    `Fornecedores: ${rows.suppliers.length}`,
+    `Produtos em estoque: ${rows.stock.length}`,
+    `Vendas: ${rows.sales.length}`,
+    `Lançamentos financeiros: ${rows.financial.length}`,
+    `Funcionários na folha: ${rows.payroll.length}`,
+    "",
+    "Próximo passo recomendado:",
+    recommendations[0]?.[4] || "Cadastre dados reais para ativar recomendações mais precisas.",
+  ];
 
-  downloadFile("relatorio-executivo-nexfinance.txt", content, "text/plain;charset=utf-8");
-  toast("Relatório executivo baixado.");
+  downloadPdf("relatorio-executivo-nexfinance.pdf", lines);
+  toast("Relatório executivo baixado em PDF.");
 }
 
 function buildSmartRecommendations() {
@@ -1090,7 +1168,7 @@ async function updateAiRecommendations() {
     renderAiRecommendationBox(result.answer, recommendations, result.provider);
   } catch (error) {
     console.error("Erro ao atualizar recomendações IA:", error);
-    renderAiRecommendationBox("", buildDemoRecommendationObjects(), "demo");
+    renderAiRecommendationBox("", buildLocalRecommendationObjects(), "local");
   }
 }
 
@@ -1101,11 +1179,11 @@ function renderAiRecommendationBox(answer, recommendations, provider) {
   box.innerHTML = "";
 
   if (answer) {
-    box.append(panel(`Análise ${provider === "gemini" ? "Gemini" : "Demo"}`, el("pre", { class: "ai-answer" }, [answer])));
+    box.append(panel(`Análise ${provider === "gemini" ? "Gemini" : "local"}`, el("pre", { class: "ai-answer" }, [answer])));
     return;
   }
 
-  box.append(panel(`Análise ${provider === "gemini" ? "Gemini" : "Demo"}`, list(
+  box.append(panel(`Análise ${provider === "gemini" ? "Gemini" : "local"}`, list(
     recommendations.map((item) => [
       item.problema || "Recomendação",
       `${item.acao_recomendada || ""} Próximo passo: ${item.proximo_passo || ""}`,
@@ -1114,7 +1192,7 @@ function renderAiRecommendationBox(answer, recommendations, provider) {
   )));
 }
 
-function buildDemoRecommendationObjects() {
+function buildLocalRecommendationObjects() {
   return buildSmartRecommendations().map((row) => ({
     prioridade: row[0],
     problema: row[1],
@@ -1125,13 +1203,159 @@ function buildDemoRecommendationObjects() {
   }));
 }
 
-function resetDemoData() {
-  localStorage.removeItem("nexfinance_demo_database");
-  Object.keys(rows).forEach((key) => {
-    rows[key] = JSON.parse(JSON.stringify(seedRows[key]));
+function buildSpreadsheetHtml(sheets) {
+  const sections = sheets.map((sheet) => `
+    <h2>${escapeHtml(sheet.title)}</h2>
+    <table border="1">
+      <thead>
+        <tr>${sheet.headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
+      </thead>
+      <tbody>
+        ${(sheet.data.length ? sheet.data : [["Sem registros cadastrados"]]).map((row) => {
+          const cells = Array.isArray(row) ? row : [row];
+          const normalized = sheet.headers.map((_, index) => cells[index] ?? "");
+          return `<tr>${normalized.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+    <br>
+  `).join("");
+
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; color: #061b2e; }
+    h1, h2 { color: #00334d; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 18px; }
+    th { background: #e8f7f5; color: #061b2e; font-weight: 700; }
+    th, td { padding: 8px; border: 1px solid #cbd5e1; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>NexFinance - Dados em planilha</h1>
+  <p>Gerado em ${escapeHtml(new Date().toLocaleString("pt-BR"))}</p>
+  ${sections}
+</body>
+</html>`;
+}
+
+function downloadPdf(filename, lines) {
+  const pdf = buildSimplePdf(lines);
+  downloadFile(filename, pdf, "application/pdf");
+}
+
+function buildSimplePdf(lines) {
+  const normalizedLines = lines.flatMap((line) => wrapPdfLine(normalizePdfText(line), 86));
+  const pages = [];
+  const pageSize = 42;
+
+  for (let index = 0; index < normalizedLines.length; index += pageSize) {
+    pages.push(normalizedLines.slice(index, index + pageSize));
+  }
+
+  if (!pages.length) pages.push(["Relatorio NexFinance"]);
+
+  const objects = [];
+  const pageObjectNumbers = [];
+
+  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
+  objects.push("");
+
+  pages.forEach((pageLines, pageIndex) => {
+    const pageObjectNumber = objects.length + 1;
+    const contentObjectNumber = pageObjectNumber + 1;
+    pageObjectNumbers.push(pageObjectNumber);
+
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${3 + pages.length * 2} 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`);
+    objects.push(buildPdfContent(pageLines, pageIndex + 1, pages.length));
   });
-  render();
-  toast("Dados de demonstração restaurados.");
+
+  objects[1] = `<< /Type /Pages /Kids [${pageObjectNumbers.map((number) => `${number} 0 R`).join(" ")}] /Count ${pages.length} >>`;
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+
+  return assemblePdf(objects);
+}
+
+function buildPdfContent(lines, page, totalPages) {
+  const commands = [
+    "BT",
+    "/F1 18 Tf",
+    `50 800 Td (${escapePdfText("NexFinance")}) Tj`,
+    "/F1 11 Tf",
+    `0 -18 Td (${escapePdfText(`Relatorio executivo - pagina ${page} de ${totalPages}`)}) Tj`,
+    "ET",
+    "BT",
+    "/F1 10 Tf",
+  ];
+
+  lines.forEach((line, index) => {
+    const y = 752 - index * 16;
+    commands.push(`1 0 0 1 50 ${y} Tm (${escapePdfText(line)}) Tj`);
+  });
+
+  commands.push("ET");
+  const stream = commands.join("\n");
+  return `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+}
+
+function assemblePdf(objects) {
+  const parts = ["%PDF-1.4\n"];
+  const offsets = [0];
+
+  objects.forEach((object, index) => {
+    offsets.push(parts.join("").length);
+    parts.push(`${index + 1} 0 obj\n${object}\nendobj\n`);
+  });
+
+  const xrefOffset = parts.join("").length;
+  parts.push(`xref\n0 ${objects.length + 1}\n`);
+  parts.push("0000000000 65535 f \n");
+  offsets.slice(1).forEach((offset) => {
+    parts.push(`${String(offset).padStart(10, "0")} 00000 n \n`);
+  });
+  parts.push(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+
+  return parts.join("");
+}
+
+function wrapPdfLine(value, maxLength) {
+  const words = String(value || "").split(/\s+/);
+  const lines = [];
+  let current = "";
+
+  words.forEach((word) => {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxLength && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  });
+
+  if (current) lines.push(current);
+  return lines.length ? lines : [""];
+}
+
+function normalizePdfText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7E]/g, "-");
+}
+
+function escapePdfText(value) {
+  return String(value).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function downloadFile(filename, content, type) {

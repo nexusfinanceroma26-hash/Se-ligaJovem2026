@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = "nexfinance-pwa-v12-ios-android";
+﻿const CACHE_NAME = "nexfinance-pwa-v16-reports-pdf-xls";
 const APP_SHELL = [
   "/",
   "/login.html",
@@ -84,6 +84,9 @@ self.addEventListener("fetch", (event) => {
     })),
   );
 });
+
+
+
 
 
 

@@ -1,5 +1,6 @@
 ﻿(function setupNexFinancePwa() {
   let deferredInstallPrompt = null;
+  const COOKIE_CONSENT_KEY = "nexfinance_cookie_consent";
 
   const ua = window.navigator.userAgent.toLowerCase();
   const isIos = /iphone|ipad|ipod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -104,6 +105,7 @@
     if (isIos) {
       setTimeout(() => showBannerWhenUseful(true), 900);
     }
+    showCookieConsent();
   });
 
   window.NexFinanceInstall = {
@@ -111,5 +113,37 @@
     ios: showIosInstructions,
     android: installOnAndroid,
   };
+
+  function showCookieConsent() {
+    if (localStorage.getItem(COOKIE_CONSENT_KEY) || document.querySelector(".cookie-consent")) return;
+
+    const banner = document.createElement("section");
+    banner.className = "cookie-consent";
+    banner.setAttribute("aria-label", "Aviso de cookies");
+    banner.innerHTML = `
+      <div class="cookie-consent-copy">
+        <strong>Cookies da NexFinance</strong>
+        <span>Usamos cookies essenciais para manter sua sessão segura e melhorar a experiência no app.</span>
+      </div>
+      <div class="cookie-consent-actions">
+        <button class="cookie-consent-secondary" type="button" data-cookie-choice="necessary">Usar apenas essenciais</button>
+        <button class="cookie-consent-primary" type="button" data-cookie-choice="accepted">Aceitar cookies</button>
+      </div>
+    `;
+
+    banner.querySelectorAll("[data-cookie-choice]").forEach((button) => {
+      button.addEventListener("click", () => {
+        localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify({
+          choice: button.dataset.cookieChoice,
+          acceptedAt: new Date().toISOString(),
+        }));
+        banner.classList.remove("show");
+        setTimeout(() => banner.remove(), 240);
+      });
+    });
+
+    document.body.append(banner);
+    requestAnimationFrame(() => banner.classList.add("show"));
+  }
 })();
 
