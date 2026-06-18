@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = "nexfinance-pwa-v17-privacy-lgpd-links";
+﻿const CACHE_NAME = "nexfinance-pwa-v18-google-password-flow";
 const APP_SHELL = [
   "/",
   "/login.html",
@@ -86,6 +86,7 @@ self.addEventListener("fetch", (event) => {
     })),
   );
 });
+
 
 
 

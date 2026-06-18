@@ -40,9 +40,11 @@
 
         <div class="login-divider"><span>ou continue com</span></div>
 
-        <button type="button" class="btn-google" aria-label="Continuar com Google">
+        <div id="googleSignInMount" class="google-signin-mount" aria-label="Continuar com Google"></div>
+
+        <button type="button" class="btn-google google-fallback is-hidden" aria-label="Abrir seletor do Google">
           <img class="google-mark" src="img/google-icon.png" alt="" aria-hidden="true">
-          Continuar com Google
+          Selecionar conta Google
         </button>
 
         <div id="loginMessage" class="message" aria-live="polite"></div>

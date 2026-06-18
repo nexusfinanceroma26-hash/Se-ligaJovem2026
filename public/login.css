@@ -871,6 +871,31 @@ select:focus {
   gap: 10px;
 }
 
+.google-signin-mount {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.google-signin-mount > div,
+.google-signin-mount iframe {
+  max-width: 100% !important;
+}
+
+.google-signin-mount.is-ready {
+  margin-top: -2px;
+}
+
+.google-fallback {
+  margin-top: 10px;
+}
+
+.google-fallback.is-hidden {
+  display: none;
+}
+
 .google-mark {
   width: 24px;
   height: 24px;

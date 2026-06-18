@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const messageBox = document.querySelector("#loginMessage");
   const submitButton = loginForm?.querySelector("button[type='submit']");
   const googleButton = document.querySelector(".btn-google");
+  const googleMount = document.querySelector("#googleSignInMount");
 
   let googleClientReady = false;
   let pendingGoogleProfile = null;
@@ -60,6 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (!data.clientId || data.clientId.includes("cole_o_client_id")) {
         googleClientReady = false;
+        googleButton?.classList.remove("is-hidden");
         return;
       }
 
@@ -71,12 +73,44 @@ document.addEventListener("DOMContentLoaded", () => {
         auto_select: false,
         cancel_on_tap_outside: true,
         use_fedcm_for_prompt: true,
+        itp_support: true,
       });
 
+      renderGoogleButton();
       googleClientReady = true;
     } catch (error) {
       console.error("Erro ao inicializar Google Login:", error);
       googleClientReady = false;
+      googleButton?.classList.remove("is-hidden");
+    }
+  }
+
+  function renderGoogleButton() {
+    if (!googleMount || !window.google?.accounts?.id) {
+      googleButton?.classList.remove("is-hidden");
+      return;
+    }
+
+    googleMount.innerHTML = "";
+
+    try {
+      const buttonWidth = Math.min(400, Math.max(260, googleMount.clientWidth || 360));
+
+      window.google.accounts.id.renderButton(googleMount, {
+        theme: "outline",
+        size: "large",
+        type: "standard",
+        text: "continue_with",
+        shape: "rectangular",
+        logo_alignment: "left",
+        width: buttonWidth,
+      });
+
+      googleButton?.classList.add("is-hidden");
+      googleMount.classList.add("is-ready");
+    } catch (error) {
+      console.error("Erro ao renderizar botao oficial do Google:", error);
+      googleButton?.classList.remove("is-hidden");
     }
   }
 
