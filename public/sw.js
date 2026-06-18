@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = "nexfinance-pwa-v12-ios-android";
+﻿const CACHE_NAME = "nexfinance-pwa-v13-crud-drawer-fix";
 const APP_SHELL = [
   "/",
   "/login.html",

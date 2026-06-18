@@ -696,14 +696,14 @@ function drawer() {
       el("h2", {}, [state.drawer || "Ação"]),
       el("button", { class: "btn icon", onclick: closeDrawer, "aria-label": "Fechar" }, ["×"]),
     ]),
-    el("div", { class: "form", id: "drawerForm" }, [
+    el("form", { class: "form", id: "drawerForm", onsubmit: saveDrawerRecord }, [
       ...(schema ? schema.fields.map(([name, label, placeholder]) => schemaField(route, name, label, placeholder, values[name])) : [
         field("Nome", "text", ""),
         field("Categoria", "text", ""),
         field("Valor", "text", ""),
         el("div", { class: "field" }, [el("label", {}, ["Observações"]), el("textarea", { name: "notes", placeholder: "Detalhe a ação..." })]),
       ]),
-      el("button", { class: "btn primary", onclick: saveDrawerRecord }, [state.editingIndex != null ? "Salvar alterações" : "Salvar"]),
+      el("button", { class: "btn primary", type: "submit" }, [state.editingIndex != null ? "Salvar alterações" : "Salvar"]),
     ]),
   ]);
 }
