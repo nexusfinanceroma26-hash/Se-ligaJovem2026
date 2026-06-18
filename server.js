@@ -640,11 +640,17 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
 });
 
 app.get("/api/auth/google/config", (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID || "";
+
+  // Para evitar falha silenciosa no front: se estiver vazio, devolvemos o endpoint com clientId vazio
+  // mas também sinalizamos o motivo no payload.
   return res.status(200).json({
     success: true,
-    clientId: process.env.GOOGLE_CLIENT_ID || "",
+    clientId,
+    configured: Boolean(clientId && !String(clientId).includes("cole_o_client_id")),
   });
 });
+
 
 app.post("/api/auth/google", authLimiter, async (req, res) => {
   try {
