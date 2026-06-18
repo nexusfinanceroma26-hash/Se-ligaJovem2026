@@ -20,6 +20,7 @@ const {
 } = require("./validation");
 
 const app = express();
+app.set("trust proxy", 1);
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET_CONFIGURED = Boolean(process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET);
@@ -162,27 +163,7 @@ app.get("/api/test-db", async (req, res) => {
       database_status: "Demo",
     });
   }
-const { data, error } = await supabase.auth.signInWithPassword({
-  email,
-  password,
-});
 
-console.log("LOGIN DATA:", data);
-console.log("LOGIN ERROR:", error);
-
-if (error) {
-  return res.status(401).json({
-    success: false,
-    message: error.message,
-  });
-}
-
-return res.status(200).json({
-  success: true,
-  message: "Login realizado com sucesso",
-  user: data.user,
-  session: data.session,
-});
   try {
     const { error } = await supabase.from("users").select("id").limit(1);
     if (error) throw error;
