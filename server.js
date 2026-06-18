@@ -1580,10 +1580,12 @@ function ensureJwtSecretConfigured(res) {
 
 function demoDashboard() {
   return {
-    receitaTotal: 486240,
-    despesasTotais: 279880,
-    lucroLiquido: 206360,
-    scoreFinanceiro: 86,
+    receitaTotal: 0,
+    despesasTotais: 0,
+    lucroLiquido: 0,
+    scoreFinanceiro: 0,
+    hasBusinessData: false,
+    message: "Cadastre vendas, estoque, fornecedores e lançamentos financeiros para ativar os indicadores.",
   };
 }
 

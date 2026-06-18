@@ -23,6 +23,19 @@ const state = {
   user: readUser(),
 };
 
+const emptyRows = {
+  customers: [],
+  suppliers: [],
+  stock: [],
+  sales: [],
+  marketplace: [],
+  financial: [],
+  capital: [],
+  payroll: [],
+  assets: [],
+  investors: [],
+};
+
 const menu = [
   ["Gestão", [
     ["dashboard", "Visão Geral", "⌂"],
@@ -117,7 +130,7 @@ const seedRows = {
   ],
 };
 
-const rows = loadDatabase(seedRows);
+const rows = loadDatabase(emptyRows);
 
 const pageInfo = {
   stock: ["Estoque", "Produtos, mínimo ideal, ruptura, giro e previsão de demanda.", ["SKU", "Produto", "Qtd", "Mínimo", "Preço", "Status"]],
@@ -381,16 +394,22 @@ function head(title, subtitle, actions = []) {
 }
 
 function dashboard() {
+  const empty = isBusinessDataEmpty();
+
   return el("div", { class: "grid" }, [
-    head("Visão geral", "Indicadores, alertas e ações prioritárias para apresentar o NexFinance.", [
+    head("Visão geral", empty ? "Comece cadastrando os dados reais da sua loja para a IA montar os indicadores." : "Indicadores, alertas e ações prioritárias da sua empresa.", [
       btn("Exportar", "⇩", false, () => downloadExecutiveReport()),
       btn("Analisar empresa", "✦", true, () => go("assistant")),
     ]),
-    presentationGuide(),
+    empty ? onboardingPanel() : presentationGuide(),
     el("div", { class: "grid cols-4" }, getKpis().map(metric)),
     el("div", { class: "split" }, [
       panel("Fluxo de caixa mensal", chartNode(), "Receitas e despesas consolidadas por mês."),
-      panel("Alertas inteligentes", list([
+      panel("Alertas inteligentes", empty ? list([
+        ["Dados da loja", "Cadastre vendas, estoque, fornecedores e contas para ativar recomendações.", pill("Início", "info")],
+        ["Notas de compra", "Use o financeiro para lançar contas a pagar enquanto a importação automática é preparada.", pill("Próximo passo", "warn")],
+        ["IA", "A análise fica mais precisa conforme você adiciona registros reais.", pill("Aguardando dados", "ok")],
+      ]) : list([
         ["Ruptura iminente", "SKU CAF-001 deve acabar em 6 dias.", pill("Crítico", "bad")],
         ["Capital de giro", "Necessidade estimada de R$ 38.400 em 21 dias.", pill("Atenção", "warn")],
         ["Fornecedor Alpha", "Nova cotação pode reduzir custos em 7,8%.", pill("Oportunidade", "ok")],
@@ -400,6 +419,23 @@ function dashboard() {
       moduleCard("Estoque inteligente", "Dois produtos estão abaixo do mínimo e precisam de reposição.", "Abrir estoque", "stock"),
       moduleCard("Cotações de fornecedores", "Compare preço, prazo e confiabilidade antes de comprar.", "Ver fornecedores", "suppliers"),
       moduleCard("Folha de pagamento", "Gere valores por funcionário e acompanhe custo total.", "Abrir folha", "payroll"),
+    ]),
+  ]);
+}
+
+function onboardingPanel() {
+  return el("section", { class: "presentation-guide" }, [
+    el("div", {}, [
+      el("span", { class: "status info" }, ["Primeiro acesso"]),
+      el("h2", {}, ["Sua visão geral começa zerada"]),
+      el("p", {}, ["Cadastre os dados da loja para o NexFinance calcular receita, despesas, lucro, estoque e contas a pagar com base em informações reais."]),
+    ]),
+    el("div", { class: "guide-steps" }, [
+      guideStep("1", "Vendas", "Registre as primeiras vendas.", "sales"),
+      guideStep("2", "Financeiro", "Inclua contas a pagar e receber.", "financial"),
+      guideStep("3", "Estoque", "Cadastre produtos e mínimos.", "stock"),
+      guideStep("4", "Fornecedores", "Adicione cotações e prazos.", "suppliers"),
+      guideStep("5", "IA", "Peça recomendações com dados reais.", "assistant"),
     ]),
   ]);
 }
@@ -414,8 +450,10 @@ function metric(item) {
 }
 
 function chartNode() {
+  const currentChart = isBusinessDataEmpty() ? chart.map(([label]) => [label, 0, 0]) : chart;
+
   return el("div", {}, [
-    el("div", { class: "chart" }, chart.map(([label, revenue, cost]) => el("div", { class: "bar" }, [
+    el("div", { class: "chart" }, currentChart.map(([label, revenue, cost]) => el("div", { class: "bar" }, [
       el("i", { style: `height:${revenue * 2}px` }),
       el("b", { style: `height:${cost * 2}px` }),
       el("label", {}, [label]),
@@ -845,7 +883,7 @@ function initials(name = "Usuário Teste") {
 
 function loadDatabase(seed) {
   try {
-    const saved = JSON.parse(localStorage.getItem("nexfinance_demo_database") || "null");
+    const saved = JSON.parse(localStorage.getItem(getDatabaseKey()) || "null");
     return saved || structuredClone(seed);
   } catch {
     return JSON.parse(JSON.stringify(seed));
@@ -853,7 +891,12 @@ function loadDatabase(seed) {
 }
 
 function saveDatabase() {
-  localStorage.setItem("nexfinance_demo_database", JSON.stringify(rows));
+  localStorage.setItem(getDatabaseKey(), JSON.stringify(rows));
+}
+
+function getDatabaseKey() {
+  const identifier = state?.user?.id || state?.user?.email || "guest";
+  return `nexfinance_database_${String(identifier).toLowerCase()}`;
 }
 
 function saveDrawerRecord(event) {
@@ -925,17 +968,22 @@ function getKpis() {
     .filter((row) => String(row[2]).toLowerCase().includes("despesa"))
     .reduce((total, row) => total + parseMoney(row[3]), 0);
   const stockRisk = rows.stock.filter((row) => String(row[5]).toLowerCase().includes("ruptura")).length;
-  const expenses = payrollTotal + financialExpense + 84200;
-  const revenue = Math.max(salesTotal * 18 + financialRevenue, 486240);
+  const expenses = payrollTotal + financialExpense;
+  const revenue = salesTotal + financialRevenue;
   const profit = revenue - expenses;
-  const score = Math.max(62, Math.min(96, 88 - stockRisk * 4 + (profit > 0 ? 2 : -10)));
+  const hasData = !isBusinessDataEmpty();
+  const score = hasData ? Math.max(35, Math.min(96, 78 - stockRisk * 4 + (profit > 0 ? 8 : -10))) : 0;
 
   return [
-    { label: "Receita total", value: money.format(revenue), delta: "+12,4%", help: "Vendas e marketplace consolidados", progress: 78 },
-    { label: "Despesas", value: money.format(expenses), delta: "-3,1%", help: "Custos operacionais e folha", progress: 54 },
-    { label: "Lucro líquido", value: money.format(profit), delta: profit >= 0 ? "+18,9%" : "-8,2%", help: "Resultado estimado do mês", progress: profit >= 0 ? 67 : 38 },
-    { label: "Score financeiro", value: `${score}/100`, delta: `${stockRisk ? "-" : "+"}${stockRisk || 5} pts`, help: "Impacto de caixa, estoque e margem", progress: score },
+    { label: "Receita total", value: money.format(revenue), delta: hasData ? "Atual" : "0%", help: hasData ? "Vendas e marketplace consolidados" : "Cadastre vendas para calcular", progress: hasData ? Math.min(92, Math.max(12, revenue / 1000)) : 0 },
+    { label: "Despesas", value: money.format(expenses), delta: hasData ? "Atual" : "0%", help: hasData ? "Custos operacionais e folha" : "Inclua contas a pagar", progress: hasData ? Math.min(92, Math.max(12, expenses / 1000)) : 0 },
+    { label: "Lucro líquido", value: money.format(profit), delta: hasData ? (profit >= 0 ? "Positivo" : "Negativo") : "0%", help: hasData ? "Resultado estimado do mês" : "Aguardando dados", progress: hasData ? (profit >= 0 ? 67 : 38) : 0 },
+    { label: "Score financeiro", value: hasData ? `${score}/100` : "0/100", delta: hasData ? `${stockRisk ? "-" : "+"}${stockRisk || 0} pts` : "0 pts", help: hasData ? "Impacto de caixa, estoque e margem" : "Ativa após registros", progress: score },
   ];
+}
+
+function isBusinessDataEmpty() {
+  return ["customers", "suppliers", "stock", "sales", "marketplace", "financial", "payroll", "assets"].every((key) => !rows[key]?.length);
 }
 
 function sumRows(data, index) {
@@ -1126,7 +1174,7 @@ function buildDemoRecommendationObjects() {
 }
 
 function resetDemoData() {
-  localStorage.removeItem("nexfinance_demo_database");
+  localStorage.removeItem(getDatabaseKey());
   Object.keys(rows).forEach((key) => {
     rows[key] = JSON.parse(JSON.stringify(seedRows[key]));
   });
