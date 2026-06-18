@@ -123,7 +123,7 @@
     banner.innerHTML = `
       <div class="cookie-consent-copy">
         <strong>Cookies da NexFinance</strong>
-        <span>Usamos cookies essenciais para manter sua sessão segura e melhorar a experiência no app.</span>
+        <span>Usamos cookies essenciais para manter sua sessão segura e melhorar a experiência no app. Veja a <a href="privacidade.html">Política de Privacidade</a> e a página de <a href="lgpd.html">LGPD</a>.</span>
       </div>
       <div class="cookie-consent-actions">
         <button class="cookie-consent-secondary" type="button" data-cookie-choice="necessary">Usar apenas essenciais</button>

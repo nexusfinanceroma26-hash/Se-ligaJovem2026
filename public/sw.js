@@ -1,10 +1,12 @@
-﻿const CACHE_NAME = "nexfinance-pwa-v16-reports-pdf-xls";
+﻿const CACHE_NAME = "nexfinance-pwa-v17-privacy-lgpd-links";
 const APP_SHELL = [
   "/",
   "/login.html",
   "/cadastro.html",
   "/dashboard.html",
   "/esqueci.html",
+  "/privacidade.html",
+  "/lgpd.html",
   "/perfil-investidor.html",
   "/offline.html",
   "/login.css",
@@ -84,6 +86,7 @@ self.addEventListener("fetch", (event) => {
     })),
   );
 });
+
 
 
 
