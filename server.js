@@ -2269,6 +2269,385 @@ Dados usados:
 - Acoes de capital de giro: ${Array.isArray(capitalPlan) ? capitalPlan.length : 0}`;
 }
 
+// Alimentacao final da IA: esta declaracao fica por ultimo e sobrescreve versoes antigas.
+function buildNexFinancePrompt({ module, question, data, json = false }) {
+  return `
+Voce e a IA da NexFinance, uma assistente financeira criada para ajudar pequenos comerciantes, MEIs, microempreendedores, prestadores de servico e empreendedores locais.
+
+Sua principal funcao nao e apenas responder rapido. Antes de analisar, voce deve entender a situacao do cliente.
+Converse de forma simples, humana, educada e pratica, como um consultor financeiro explicando para uma pessoa que pode ter pouca experiencia com tecnologia ou financas.
+
+Regras principais:
+- Nunca comece com resposta tecnica demais.
+- Nunca responda de forma fria, seca ou robotica.
+- Nunca entregue so numeros.
+- Sempre tente entender o contexto do cliente antes de dar uma conclusao.
+- Nunca invente valores, vendas, despesas, lucro, impostos, prazos ou previsoes.
+- Se faltar informacao, diga exatamente o que falta e peca somente o essencial.
+- Nunca culpe o cliente pela desorganizacao.
+- Nunca use tom de julgamento.
+- Nunca diga apenas "procure controlar melhor"; diga o primeiro passo concreto.
+- Use dados agregados recebidos do sistema e nao exponha dados sensiveis.
+
+Escolha mentalmente um modo antes de responder. Nao diga ao usuario qual modo esta usando.
+
+MODOS DE ATENDIMENTO:
+
+1. MODO ACOLHIMENTO
+Use quando o usuario cumprimentar, pedir ajuda generica, parecer confuso, nao souber por onde comecar ou disser que o negocio esta desorganizado.
+Responda com acolhimento, poucas perguntas e sem analise completa.
+Pergunte:
+1. Qual e o tipo do seu negocio?
+2. Quanto vendeu mais ou menos neste mes?
+3. Quais sao as principais despesas?
+4. Tem alguma conta atrasada?
+5. A maior dificuldade hoje e dinheiro, estoque, vendas ou organizacao?
+
+2. MODO ENTENDIMENTO DO PROBLEMA
+Use quando houver uma dificuldade sem dados suficientes, como "vendo, mas nao sobra dinheiro", "estoque acaba rapido" ou "tenho muita conta".
+Mostre que entendeu, explique possibilidades simples e faca perguntas especificas. Nao conclua sem dados.
+
+3. MODO ANALISE FINANCEIRA
+Use quando houver vendas, despesas, lucro ou contas a pagar/atrasadas.
+Formato obrigatorio:
+DIAGNOSTICO SIMPLES:
+O QUE ESTA BOM:
+PONTOS DE ATENCAO:
+O QUE ISSO SIGNIFICA:
+O QUE FAZER AGORA:
+PROXIMO PASSO:
+
+4. MODO ESTOQUE
+Use quando falar de produtos acabando, estoque baixo, produtos parados, compras, mais vendidos ou perda de vendas por falta de produto.
+Formato:
+SITUACAO DO ESTOQUE:
+PRODUTOS PRIORITARIOS:
+RISCO:
+ACAO RECOMENDADA:
+PROXIMO PASSO:
+Regras: produto muito vendido com pouco estoque e prioridade alta; produto parado pede promocao, combo ou reduzir compra; abaixo do minimo pede reposicao.
+
+5. MODO CLIENTES
+Use para clientes, fidelizacao, clientes que sumiram, inadimplencia, vender mais, atendimento ou cadastro.
+Formato:
+SITUACAO DOS CLIENTES:
+OPORTUNIDADES:
+ACOES SIMPLES:
+PROXIMO PASSO:
+
+6. MODO FORNECEDORES
+Use para fornecedor, compra, preco, prazo, atraso ou negociacao.
+Formato:
+SITUACAO DOS FORNECEDORES:
+IMPACTO NO NEGOCIO:
+ACAO RECOMENDADA:
+PROXIMO PASSO:
+Explique como fornecedor afeta caixa, estoque e vendas. Sugira comparar preco, prazo e confiabilidade.
+
+7. MODO AGENDA E ORGANIZACAO
+Use quando pedir agenda, tarefas, rotina, organizacao ou o que fazer na semana.
+Formato:
+AGENDA DE ORGANIZACAO:
+HOJE:
+ESTA SEMANA:
+ESTE MES:
+Faca uma agenda curta, possivel e priorize o que evita perda de dinheiro, perda de venda ou desorganizacao.
+
+8. MODO PLANEJAMENTO DO MES SEGUINTE
+Use para planejamento do proximo mes, meta, previsao ou organizacao mensal.
+Formato:
+PLANEJAMENTO DO PROXIMO MES:
+1. META DE VENDAS:
+2. LIMITE DE DESPESAS:
+3. CONTAS PRIORITARIAS:
+4. ESTOQUE:
+5. RESERVA FINANCEIRA:
+6. ACOES PARA VENDER MAIS:
+7. AGENDA DO MES:
+8. PRIMEIRO PASSO:
+Se nao houver dados suficientes, explique isso e monte um plano inicial de organizacao.
+
+9. MODO EXPLICACAO SIMPLES
+Use quando perguntar conceitos como lucro, fluxo de caixa, despesa fixa, separar dinheiro pessoal, controlar estoque ou calcular algo.
+Formato:
+EXPLICACAO SIMPLES:
+EXEMPLO:
+COMO USAR NO SEU NEGOCIO:
+Use exemplo de comercio local e evite termos dificeis.
+
+10. MODO DADOS INSUFICIENTES
+Use quando o usuario pedir analise sem informacoes suficientes.
+Nao invente resposta. Peca somente os dados necessarios:
+1. Vendas do mes.
+2. Despesas do mes.
+3. Contas a pagar.
+4. Contas atrasadas.
+5. Produtos que mais vendem.
+6. Produtos que estao acabando.
+7. Maior dificuldade atual.
+
+Linguagem obrigatoria:
+- Prefira "dinheiro que entrou" em vez de "receita bruta".
+- Prefira "dinheiro que saiu" em vez de "despesas operacionais".
+- Prefira "sobrou pouco dinheiro" em vez de "baixa margem operacional".
+- Prefira "produto parado" em vez de "estoque sem giro".
+- Prefira "contas atrasadas" em vez de "obrigacoes vencidas".
+- Prefira "guardar uma parte do lucro" em vez de "constituir reserva de capital".
+
+Regras de decisao:
+- Saudacao ou pedido generico: modo acolhimento.
+- Problema sem dados: modo entendimento do problema.
+- Vendas, despesas, lucro ou contas: modo analise financeira.
+- Produtos, compras ou estoque: modo estoque.
+- Clientes ou vendas: modo clientes.
+- Fornecedores: modo fornecedores.
+- Rotina, tarefas ou agenda: modo agenda.
+- Mes seguinte, meta ou projeto financeiro: modo planejamento.
+- Conceito ou explicacao: modo explicacao simples.
+- Analise sem informacao suficiente: modo dados insuficientes.
+
+Se o sistema pedir recomendacoes estruturadas, responda em JSON valido quando json=true.
+${json ? `Formato JSON obrigatorio:
+[
+  {
+    "prioridade": "Baixa | Media | Alta | Critica",
+    "problema": "Problema ou oportunidade identificada",
+    "impacto": "Impacto simples no negocio",
+    "risco": "Baixo | Medio | Alto",
+    "acao_recomendada": "Acao pratica",
+    "proximo_passo": "Primeira acao"
+  }
+]` : ""}
+
+Modulo atual: ${module}
+Mensagem do usuario: ${question}
+
+Dados reais e agregados recebidos:
+${JSON.stringify(data, null, 2)}
+
+Regra final:
+Primeiro entenda, depois oriente. A resposta deve fazer o comerciante pensar: "Agora eu entendi o que esta acontecendo e sei qual e o proximo passo."
+`;
+}
+
+// Fallback local quando a IA externa nao responde. Mantem o mesmo comportamento consultivo.
+function buildDemoAiAnswer(module, data, question) {
+  const message = String(question || "").trim();
+  const normalized = message
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const words = normalized.split(/\s+/).filter(Boolean);
+  const hasNumbers = /\d/.test(message);
+  const hasBusinessData = [
+    data?.estoque,
+    data?.stock,
+    data?.fornecedores,
+    data?.suppliers,
+    data?.vendas,
+    data?.sales,
+    data?.lancamentosFinanceiros,
+    data?.capitalDeGiro?.planoDeAcao,
+    data?.folha,
+    data?.patrimonio,
+    data?.clientes,
+  ].some((value) => Array.isArray(value) ? value.length > 0 : Boolean(value));
+
+  const isGreeting = /^(oi|ola|bom dia|boa tarde|boa noite|e ai|eai|hey|hello|hi)$/.test(normalized);
+  const isConfused = /(me ajuda|nao sei|estou perdido|to perdido|o que faco|bagunca|desorganizado)/.test(normalized);
+  const asksStock = /(estoque|produto|produtos|comprar|mercadoria|ruptura|acabando|parado)/.test(normalized);
+  const asksSuppliers = /(fornecedor|fornecedores|cotacao|preco de compra|prazo|atraso|negociar)/.test(normalized);
+  const asksCustomers = /(cliente|clientes|fidelizar|inadimplencia|vender mais|atendimento)/.test(normalized);
+  const asksAgenda = /(agenda|tarefas|rotina|organizar|semana|o que fazer)/.test(normalized);
+  const asksNextMonth = /(proximo mes|mes seguinte|planejamento|meta|previsao)/.test(normalized);
+  const asksConcept = /(o que e|como calcular|fluxo de caixa|lucro|despesa fixa|separar dinheiro)/.test(normalized);
+  const asksFinance = /(financeiro|caixa|vendas|despesas|contas|lucro|dinheiro|relatorio|diagnostico|analise)/.test(normalized);
+
+  if (!hasBusinessData && (isGreeting || isConfused || (!hasNumbers && words.length < 5))) {
+    return `Ola! Eu posso te ajudar a organizar melhor o seu negocio.
+
+Para comecar, me diga so algumas coisas:
+
+1. Qual e o tipo do seu negocio?
+2. Quanto voce vendeu mais ou menos neste mes?
+3. Quais sao suas principais despesas?
+4. Voce tem alguma conta atrasada?
+5. Sua maior dificuldade hoje e dinheiro, estoque, vendas ou organizacao?
+
+Com essas respostas, eu consigo te orientar melhor.`;
+  }
+
+  if (!hasBusinessData && !hasNumbers && (asksFinance || asksStock || asksSuppliers || asksCustomers)) {
+    return `Consigo te ajudar com isso, mas preciso de algumas informacoes para nao fazer uma analise errada.
+
+Me envie, mesmo que seja aproximado:
+
+1. Vendas do mes.
+2. Despesas do mes.
+3. Contas a pagar.
+4. Contas atrasadas.
+5. Produtos que mais vendem.
+6. Produtos que estao acabando.
+7. Maior dificuldade atual.
+
+Com esses dados, eu consigo montar uma analise, uma agenda e um planejamento para o proximo mes.`;
+  }
+
+  if (asksConcept) {
+    return `EXPLICACAO SIMPLES:
+Fluxo de caixa e o controle do dinheiro que entra e sai do negocio. Ele mostra se vai sobrar dinheiro para pagar contas, comprar mercadoria e guardar reserva.
+
+EXEMPLO:
+Se hoje entraram R$ 500,00 em vendas e sairam R$ 300,00 em despesas, sobraram R$ 200,00 no caixa.
+
+COMO USAR NO SEU NEGOCIO:
+Anote todo dia o dinheiro que entrou, o dinheiro que saiu e o que ainda falta pagar. Assim voce evita surpresa no fim do mes.`;
+  }
+
+  if (asksAgenda) {
+    return `AGENDA DE ORGANIZACAO:
+
+HOJE:
+- Conferir dinheiro que entrou e saiu.
+- Prioridade: Alta.
+- Objetivo: entender o caixa real.
+
+ESTA SEMANA:
+- Revisar produtos que estao acabando e contas a pagar.
+- Prioridade: Alta.
+- Objetivo: evitar perda de vendas e atraso de contas.
+
+ESTE MES:
+- Fechar vendas, despesas e lucro estimado.
+- Prioridade: Media.
+- Objetivo: planejar o proximo mes com mais seguranca.`;
+  }
+
+  if (asksNextMonth) {
+    return `PLANEJAMENTO DO PROXIMO MES:
+
+1. META DE VENDAS:
+Defina uma meta realista com base nas vendas atuais.
+
+2. LIMITE DE DESPESAS:
+Tente manter os gastos abaixo de 70% do dinheiro que entrou.
+
+3. CONTAS PRIORITARIAS:
+Pague primeiro contas atrasadas, fornecedores essenciais e despesas que podem gerar juros.
+
+4. ESTOQUE:
+Compre primeiro produtos que mais vendem e estao perto de acabar.
+
+5. RESERVA FINANCEIRA:
+Guarde uma pequena parte do lucro, mesmo que seja pouco.
+
+6. ACOES PARA VENDER MAIS:
+Faça combos, reative clientes antigos e divulgue produtos de maior saida.
+
+7. AGENDA DO MES:
+Semana 1: organizar caixa.
+Semana 2: revisar estoque.
+Semana 3: negociar fornecedores.
+Semana 4: fechar resultado.
+
+8. PRIMEIRO PASSO:
+Comece conferindo quanto entrou e quanto saiu nos ultimos 7 dias.`;
+  }
+
+  const stock = data?.estoque || data?.stock || [];
+  const suppliers = data?.fornecedores || data?.suppliers || [];
+  const sales = data?.vendas || data?.sales || [];
+  const financial = data?.lancamentosFinanceiros || [];
+  const lowStockCount = Array.isArray(stock)
+    ? stock.filter((row) => JSON.stringify(row).toLowerCase().includes("ruptura")).length
+    : 0;
+  const supplierRisk = Array.isArray(suppliers)
+    ? suppliers.filter((row) => Number.parseInt(String(row?.[2] || row?.score || "100"), 10) < 85).length
+    : 0;
+  const pendingExpenses = Array.isArray(financial)
+    ? financial.filter((row) => JSON.stringify(row).toLowerCase().includes("despesa") && JSON.stringify(row).toLowerCase().includes("pendente")).length
+    : 0;
+
+  if (asksStock) {
+    return `SITUACAO DO ESTOQUE:
+Pelos dados atuais, ${lowStockCount > 0 ? `existem ${lowStockCount} produto(s) com risco de faltar.` : "nao encontrei ruptura critica, mas o estoque precisa continuar sendo acompanhado."}
+
+PRODUTOS PRIORITARIOS:
+Priorize produtos que vendem mais e estao abaixo do estoque minimo.
+
+RISCO:
+Se um produto de boa saida acabar, voce pode perder vendas mesmo tendo cliente querendo comprar.
+
+ACAO RECOMENDADA:
+Reponha primeiro os produtos mais vendidos, evite comprar produto parado e compare fornecedores antes da compra.
+
+PROXIMO PASSO:
+Confira hoje quais produtos estao abaixo do minimo e qual fornecedor entrega mais rapido.`;
+  }
+
+  if (asksSuppliers) {
+    return `SITUACAO DOS FORNECEDORES:
+${supplierRisk > 0 ? `Ha ${supplierRisk} fornecedor(es) com sinal de risco ou baixa confiabilidade.` : "Os fornecedores precisam ser comparados por preco, prazo e confiabilidade."}
+
+IMPACTO NO NEGOCIO:
+Fornecedor caro, atrasado ou com prazo ruim pode apertar o caixa e causar falta de produto.
+
+ACAO RECOMENDADA:
+Abra cotacao com pelo menos dois fornecedores alternativos e compare preco, prazo de entrega e condicao de pagamento.
+
+PROXIMO PASSO:
+Escolha um produto importante e peca cotacao hoje antes da proxima compra.`;
+  }
+
+  if (asksCustomers) {
+    return `SITUACAO DOS CLIENTES:
+Clientes precisam ser acompanhados por frequencia, valor comprado e tempo sem comprar.
+
+OPORTUNIDADES:
+Voce pode vender mais reativando clientes antigos, oferecendo combos e mantendo contato pelo WhatsApp.
+
+ACOES SIMPLES:
+- Chamar clientes que compraram antes e sumiram.
+- Oferecer uma novidade ou promocao simples.
+- Anotar quem compra sempre e quem esta inadimplente.
+
+PROXIMO PASSO:
+Separe hoje 5 clientes antigos e mande uma mensagem educada oferecendo uma novidade.`;
+  }
+
+  return `DIAGNOSTICO SIMPLES:
+Pelos dados atuais, o negocio precisa acompanhar dinheiro que entrou, dinheiro que saiu, estoque, fornecedores e vendas juntos. ${lowStockCount > 0 ? `Existem ${lowStockCount} produto(s) com risco de falta.` : "Nao encontrei falta critica de estoque nos dados enviados."} ${pendingExpenses > 0 ? `Tambem existem ${pendingExpenses} despesa(s) pendente(s).` : "As contas precisam continuar sendo registradas para evitar surpresa."}
+
+O QUE ESTA BOM:
+- Ja existem dados para comecar uma leitura do negocio.
+- Voce consegue cruzar vendas, estoque, financeiro e fornecedores.
+
+PONTOS DE ATENCAO:
+${lowStockCount > 0 ? "- Produto abaixo do minimo pode causar perda de vendas." : "- Ainda e importante acompanhar produtos que mais vendem."}
+${supplierRisk > 0 ? "- Existem fornecedores que merecem comparacao antes da compra." : "- Fornecedores devem ser avaliados por preco, prazo e confiabilidade."}
+${pendingExpenses > 0 ? "- Contas pendentes podem apertar o caixa." : "- Continue registrando contas a pagar e receber."}
+
+O QUE ISSO SIGNIFICA:
+Se o estoque e o caixa nao forem acompanhados juntos, a empresa pode vender menos por falta de produto ou comprar demais e ficar sem dinheiro para pagar contas.
+
+O QUE FAZER AGORA:
+1. Conferir produtos abaixo do minimo.
+2. Revisar contas pendentes.
+3. Comparar fornecedores antes da proxima compra.
+4. Separar dinheiro da empresa do dinheiro pessoal.
+
+PROXIMO PASSO:
+Comece hoje pelo estoque critico e pelas contas pendentes. Essa e a acao mais simples para evitar perda de vendas e proteger o caixa.
+
+Dados usados:
+- Modulo: ${module}
+- Pergunta: ${question || "Analise automatica"}
+- Itens de estoque: ${Array.isArray(stock) ? stock.length : 0}
+- Fornecedores: ${Array.isArray(suppliers) ? suppliers.length : 0}
+- Vendas: ${Array.isArray(sales) ? sales.length : 0}
+- Lancamentos financeiros: ${Array.isArray(financial) ? financial.length : 0}`;
+}
+
 app.use((err, req, res, next) => {
   if (err?.message === "Origem não permitida pelo CORS.") {
     logSecurityEvent("cors_blocked", req, { origin: req.get("origin") || "sem_origin" });
