@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = "nexfinance-pwa-v13-crud-drawer-fix";
+﻿const CACHE_NAME = "nexfinance-pwa-v14-real-operation";
 const APP_SHELL = [
   "/",
   "/login.html",
@@ -84,6 +84,7 @@ self.addEventListener("fetch", (event) => {
     })),
   );
 });
+
 
 
 

@@ -365,7 +365,7 @@ function topbar() {
       }),
     ]),
     el("div", { class: "top-actions" }, [
-      pill("Modo apresentação", "info"),
+      pill("Operação real", "ok"),
       btn("Nova ação", "+", true, () => openDrawer("Nova ação")),
       el("button", { class: "btn danger", onclick: logout }, ["Sair"]),
     ]),
@@ -401,7 +401,7 @@ function dashboard() {
       btn("Exportar", "⇩", false, () => downloadExecutiveReport()),
       btn("Analisar empresa", "✦", true, () => go("assistant")),
     ]),
-    empty ? onboardingPanel() : presentationGuide(),
+    empty ? onboardingPanel() : operationsOverviewPanel(),
     el("div", { class: "grid cols-4" }, getKpis().map(metric)),
     el("div", { class: "split" }, [
       panel("Fluxo de caixa mensal", chartNode(), "Receitas e despesas consolidadas por mês."),
@@ -462,19 +462,19 @@ function chartNode() {
   ]);
 }
 
-function presentationGuide() {
+function operationsOverviewPanel() {
   return el("section", { class: "presentation-guide" }, [
     el("div", {}, [
-      el("span", { class: "status info" }, ["Roteiro para banca"]),
-      el("h2", {}, ["Demonstração em 5 passos"]),
-      el("p", {}, ["Mostre o problema, cadastre um dado, veja a IA reagir e exporte um relatório. Esse fluxo prova o valor do NexFinance em poucos minutos."]),
+      el("span", { class: "status info" }, ["Rotina do negócio"]),
+      el("h2", {}, ["Acompanhamento diário da loja"]),
+      el("p", {}, ["Registre dados reais, acompanhe caixa, evite falta de produto e use a IA para priorizar as próximas decisões do negócio."]),
     ]),
     el("div", { class: "guide-steps" }, [
-      guideStep("1", "Visão geral", "Mostre score, caixa e alertas.", "dashboard"),
-      guideStep("2", "Estoque", "Cadastre um produto em risco.", "stock"),
-      guideStep("3", "Fornecedores", "Compare prazo, score e cotação.", "suppliers"),
-      guideStep("4", "IA", "Explique a recomendação.", "recommendations"),
-      guideStep("5", "Relatório", "Baixe o resumo executivo.", "reports"),
+      guideStep("1", "Vendas", "Atualize as entradas do dia.", "sales"),
+      guideStep("2", "Financeiro", "Revise contas a pagar e receber.", "financial"),
+      guideStep("3", "Estoque", "Confira produtos abaixo do mínimo.", "stock"),
+      guideStep("4", "Fornecedores", "Compare preço, prazo e cotação.", "suppliers"),
+      guideStep("5", "IA", "Peça uma análise dos dados atuais.", "recommendations"),
     ]),
   ]);
 }
@@ -578,7 +578,7 @@ function recommendations() {
 
 function reports() {
   return el("div", { class: "grid" }, [
-    head("Relatórios", "PDF, planilhas e visão executiva para apresentação.", [btn("Baixar relatório", "⇩", true, () => downloadExecutiveReport()), btn("Agendar envio", "▷", false, () => openDrawer("Agendar relatório", "reports"))]),
+    head("Relatórios", "PDF, planilhas e visão executiva para acompanhar a empresa.", [btn("Baixar relatório", "⇩", true, () => downloadExecutiveReport()), btn("Agendar envio", "▷", false, () => openDrawer("Agendar relatório", "reports"))]),
     el("div", { class: "kanban" }, [
       lane("Prontos", ["DRE gerencial - Maio", "Fluxo de caixa 30 dias", "Estoque crítico"]),
       lane("Agendados", ["Análise semanal IA", "LGPD mensal", "Marketplace performance"]),
@@ -590,7 +590,6 @@ function reports() {
 function settings() {
   return el("div", { class: "grid" }, [
     head("Configurações", "Empresa, usuários, permissões e preferências da plataforma.", [
-      btn("Restaurar demo", "↻", false, resetDemoData),
       btn("Salvar alterações", "✓", true, () => toast("Configurações salvas.")),
     ]),
     el("div", { class: "grid cols-2" }, [
@@ -910,7 +909,7 @@ function saveDrawerRecord(event) {
 
   if (!schema) {
     closeDrawer();
-    toast("Ação registrada para apresentação.");
+    toast("Ação registrada.");
     return;
   }
 
@@ -1138,7 +1137,7 @@ async function updateAiRecommendations() {
     renderAiRecommendationBox(result.answer, recommendations, result.provider);
   } catch (error) {
     console.error("Erro ao atualizar recomendações IA:", error);
-    renderAiRecommendationBox("", buildDemoRecommendationObjects(), "demo");
+    renderAiRecommendationBox("", buildLocalRecommendationObjects(), "local");
   }
 }
 
@@ -1149,11 +1148,11 @@ function renderAiRecommendationBox(answer, recommendations, provider) {
   box.innerHTML = "";
 
   if (answer) {
-    box.append(panel(`Análise ${provider === "gemini" ? "Gemini" : "Demo"}`, el("pre", { class: "ai-answer" }, [answer])));
+    box.append(panel(`Análise ${provider === "gemini" ? "Gemini" : "local"}`, el("pre", { class: "ai-answer" }, [answer])));
     return;
   }
 
-  box.append(panel(`Análise ${provider === "gemini" ? "Gemini" : "Demo"}`, list(
+  box.append(panel(`Análise ${provider === "gemini" ? "Gemini" : "local"}`, list(
     recommendations.map((item) => [
       item.problema || "Recomendação",
       `${item.acao_recomendada || ""} Próximo passo: ${item.proximo_passo || ""}`,
@@ -1162,7 +1161,7 @@ function renderAiRecommendationBox(answer, recommendations, provider) {
   )));
 }
 
-function buildDemoRecommendationObjects() {
+function buildLocalRecommendationObjects() {
   return buildSmartRecommendations().map((row) => ({
     prioridade: row[0],
     problema: row[1],
@@ -1171,15 +1170,6 @@ function buildDemoRecommendationObjects() {
     acao_recomendada: row[4],
     proximo_passo: "Revise o módulo indicado e execute a ação sugerida.",
   }));
-}
-
-function resetDemoData() {
-  localStorage.removeItem(getDatabaseKey());
-  Object.keys(rows).forEach((key) => {
-    rows[key] = JSON.parse(JSON.stringify(seedRows[key]));
-  });
-  render();
-  toast("Dados de demonstração restaurados.");
 }
 
 function downloadFile(filename, content, type) {
