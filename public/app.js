@@ -398,7 +398,7 @@ function dashboard() {
 
   return el("div", { class: "grid" }, [
     head("Visão geral", empty ? "Comece cadastrando os dados reais da sua loja para a IA montar os indicadores." : "Indicadores, alertas e ações prioritárias da sua empresa.", [
-      btn("Exportar", "⇩", false, () => downloadExecutiveReport()),
+      btn("Baixar PDF", "⇩", false, () => downloadExecutiveReportPdf()),
       btn("Analisar empresa", "✦", true, () => go("assistant")),
     ]),
     empty ? onboardingPanel() : operationsOverviewPanel(),
@@ -492,8 +492,8 @@ function dataPage(key) {
   return el("div", { class: "grid" }, [
     head(title, subtitle, [
       btn("Novo registro", "+", true, () => openDrawer(`Novo ${title}`, key)),
-      btn("Importar CSV", "⇧", false, () => toast("Importação simulada com sucesso.")),
-      btn("Exportar", "⇩", false, () => downloadCsv(title, headers, rows[key])),
+      btn("Importar planilha", "⇧", false, () => toast("Importação de planilha registrada.")),
+      btn("Baixar planilha", "⇩", false, () => downloadSpreadsheet(title, headers, rows[key])),
     ]),
     tabs(["Todos", "Críticos", "IA sugeriu ação", "Arquivados"]),
     tablePanel(title, headers, rows[key], key),
@@ -578,7 +578,11 @@ function recommendations() {
 
 function reports() {
   return el("div", { class: "grid" }, [
-    head("Relatórios", "PDF, planilhas e visão executiva para acompanhar a empresa.", [btn("Baixar relatório", "⇩", true, () => downloadExecutiveReport()), btn("Agendar envio", "▷", false, () => openDrawer("Agendar relatório", "reports"))]),
+    head("Relatórios", "PDF, planilhas e visão executiva para acompanhar a empresa.", [
+      btn("Baixar PDF", "⇩", true, () => downloadExecutiveReportPdf()),
+      btn("Baixar planilha", "▦", false, () => downloadAllSpreadsheets()),
+      btn("Agendar envio", "▷", false, () => openDrawer("Agendar relatório", "reports")),
+    ]),
     el("div", { class: "kanban" }, [
       lane("Prontos", ["DRE gerencial - Maio", "Fluxo de caixa 30 dias", "Estoque crítico"]),
       lane("Agendados", ["Análise semanal IA", "LGPD mensal", "Marketplace performance"]),
@@ -1017,29 +1021,56 @@ function calculateWorkingCapitalGap() {
   return Math.max(0, payable + stockReplacement - receivable);
 }
 
-function downloadCsv(title, headers, data) {
-  const rowsToExport = [headers, ...data];
-  const csv = rowsToExport
-    .map((row) => row.map((item) => `"${String(item).replace(/"/g, '""')}"`).join(";"))
-    .join("\n");
-
-  downloadFile(`${slug(title)}.csv`, `\ufeff${csv}`, "text/csv;charset=utf-8");
-  toast(`${title} exportado em CSV.`);
+function downloadSpreadsheet(title, headers, data) {
+  const html = buildSpreadsheetHtml([{ title, headers, data }]);
+  downloadFile(`${slug(title)}.xls`, html, "application/vnd.ms-excel;charset=utf-8");
+  toast(`${title} baixado em planilha.`);
 }
 
-function downloadExecutiveReport() {
+function downloadAllSpreadsheets() {
+  const sheets = Object.entries(pageInfo).map(([key, [title, , headers]]) => ({
+    title,
+    headers,
+    data: rows[key] || [],
+  }));
+
+  sheets.unshift({
+    title: "Indicadores",
+    headers: ["Indicador", "Valor", "Variação", "Observação"],
+    data: getKpis().map((item) => [item.label, item.value, item.delta, item.help]),
+  });
+
+  const html = buildSpreadsheetHtml(sheets);
+  downloadFile("dados-nexfinance.xls", html, "application/vnd.ms-excel;charset=utf-8");
+  toast("Dados baixados em planilha.");
+}
+
+function downloadExecutiveReportPdf() {
   const recommendations = buildSmartRecommendations();
-  const content = [
+  const lines = [
     "Relatório Executivo NexFinance",
+    `Gerado em ${new Date().toLocaleDateString("pt-BR")}`,
     "",
+    "Indicadores principais:",
     ...getKpis().map((item) => `${item.label}: ${item.value} (${item.delta})`),
     "",
     "Recomendações principais:",
     ...recommendations.map((item) => `- ${item[1]} Impacto estimado: ${item[2]}. Risco: ${item[3]}.`),
-  ].join("\n");
+    "",
+    "Resumo dos dados cadastrados:",
+    `Clientes: ${rows.customers.length}`,
+    `Fornecedores: ${rows.suppliers.length}`,
+    `Produtos em estoque: ${rows.stock.length}`,
+    `Vendas: ${rows.sales.length}`,
+    `Lançamentos financeiros: ${rows.financial.length}`,
+    `Funcionários na folha: ${rows.payroll.length}`,
+    "",
+    "Próximo passo recomendado:",
+    recommendations[0]?.[4] || "Cadastre dados reais para ativar recomendações mais precisas.",
+  ];
 
-  downloadFile("relatorio-executivo-nexfinance.txt", content, "text/plain;charset=utf-8");
-  toast("Relatório executivo baixado.");
+  downloadPdf("relatorio-executivo-nexfinance.pdf", lines);
+  toast("Relatório executivo baixado em PDF.");
 }
 
 function buildSmartRecommendations() {
@@ -1170,6 +1201,161 @@ function buildLocalRecommendationObjects() {
     acao_recomendada: row[4],
     proximo_passo: "Revise o módulo indicado e execute a ação sugerida.",
   }));
+}
+
+function buildSpreadsheetHtml(sheets) {
+  const sections = sheets.map((sheet) => `
+    <h2>${escapeHtml(sheet.title)}</h2>
+    <table border="1">
+      <thead>
+        <tr>${sheet.headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
+      </thead>
+      <tbody>
+        ${(sheet.data.length ? sheet.data : [["Sem registros cadastrados"]]).map((row) => {
+          const cells = Array.isArray(row) ? row : [row];
+          const normalized = sheet.headers.map((_, index) => cells[index] ?? "");
+          return `<tr>${normalized.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+    <br>
+  `).join("");
+
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; color: #061b2e; }
+    h1, h2 { color: #00334d; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 18px; }
+    th { background: #e8f7f5; color: #061b2e; font-weight: 700; }
+    th, td { padding: 8px; border: 1px solid #cbd5e1; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>NexFinance - Dados em planilha</h1>
+  <p>Gerado em ${escapeHtml(new Date().toLocaleString("pt-BR"))}</p>
+  ${sections}
+</body>
+</html>`;
+}
+
+function downloadPdf(filename, lines) {
+  const pdf = buildSimplePdf(lines);
+  downloadFile(filename, pdf, "application/pdf");
+}
+
+function buildSimplePdf(lines) {
+  const normalizedLines = lines.flatMap((line) => wrapPdfLine(normalizePdfText(line), 86));
+  const pages = [];
+  const pageSize = 42;
+
+  for (let index = 0; index < normalizedLines.length; index += pageSize) {
+    pages.push(normalizedLines.slice(index, index + pageSize));
+  }
+
+  if (!pages.length) pages.push(["Relatorio NexFinance"]);
+
+  const objects = [];
+  const pageObjectNumbers = [];
+
+  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
+  objects.push("");
+
+  pages.forEach((pageLines, pageIndex) => {
+    const pageObjectNumber = objects.length + 1;
+    const contentObjectNumber = pageObjectNumber + 1;
+    pageObjectNumbers.push(pageObjectNumber);
+
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${3 + pages.length * 2} 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`);
+    objects.push(buildPdfContent(pageLines, pageIndex + 1, pages.length));
+  });
+
+  objects[1] = `<< /Type /Pages /Kids [${pageObjectNumbers.map((number) => `${number} 0 R`).join(" ")}] /Count ${pages.length} >>`;
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+
+  return assemblePdf(objects);
+}
+
+function buildPdfContent(lines, page, totalPages) {
+  const commands = [
+    "BT",
+    "/F1 18 Tf",
+    `50 800 Td (${escapePdfText("NexFinance")}) Tj`,
+    "/F1 11 Tf",
+    `0 -18 Td (${escapePdfText(`Relatorio executivo - pagina ${page} de ${totalPages}`)}) Tj`,
+    "ET",
+    "BT",
+    "/F1 10 Tf",
+  ];
+
+  lines.forEach((line, index) => {
+    const y = 752 - index * 16;
+    commands.push(`1 0 0 1 50 ${y} Tm (${escapePdfText(line)}) Tj`);
+  });
+
+  commands.push("ET");
+  const stream = commands.join("\n");
+  return `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+}
+
+function assemblePdf(objects) {
+  const parts = ["%PDF-1.4\n"];
+  const offsets = [0];
+
+  objects.forEach((object, index) => {
+    offsets.push(parts.join("").length);
+    parts.push(`${index + 1} 0 obj\n${object}\nendobj\n`);
+  });
+
+  const xrefOffset = parts.join("").length;
+  parts.push(`xref\n0 ${objects.length + 1}\n`);
+  parts.push("0000000000 65535 f \n");
+  offsets.slice(1).forEach((offset) => {
+    parts.push(`${String(offset).padStart(10, "0")} 00000 n \n`);
+  });
+  parts.push(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+
+  return parts.join("");
+}
+
+function wrapPdfLine(value, maxLength) {
+  const words = String(value || "").split(/\s+/);
+  const lines = [];
+  let current = "";
+
+  words.forEach((word) => {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxLength && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  });
+
+  if (current) lines.push(current);
+  return lines.length ? lines : [""];
+}
+
+function normalizePdfText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7E]/g, "-");
+}
+
+function escapePdfText(value) {
+  return String(value).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function downloadFile(filename, content, type) {
