@@ -525,7 +525,6 @@ app.get("/api/auth/verify-email", async (req, res) => {
     }));
   }
 });
-console.log("Registrando rota LOGIN");
 app.post("/api/auth/login", authLimiter, async (req, res) => {
   try {
     let { email, password } = req.body;
@@ -567,19 +566,6 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
       .eq("email", email)
       .limit(1);
 
-    // Faz login pela auth do Supabase (valida senha e cria session)
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (authError) {
-      return res.status(401).json({
-        success: false,
-        message: authError.message,
-      });
-    }
-
     if (queryError) {
       return res.status(500).json({
         success: false,
@@ -603,8 +589,16 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
       });
     }
 
-    // opcional: se quiser checar hash local também, pode manter o compare.
-    // porém o Supabase auth já validou a senha.
+    // Segurança: o cadastro do NexFinance grava senha com bcrypt em public.users.
+    // Por isso o login valida o hash local, e não o Supabase Auth separado.
+    if (!(await bcrypt.compare(password, user.password_hash))) {
+      logSecurityEvent("login_failed", req, { email: maskEmail(email), mode: "supabase_table" });
+      return res.status(401).json({
+        success: false,
+        message: "Email ou senha incorretos.",
+      });
+    }
+
     return sendAuthResponse(res, 200, user, "Login realizado com sucesso.");
   } catch (error) {
     console.error("Erro no login:", error);
@@ -944,10 +938,12 @@ app.post("/api/auth/reset-password", authLimiter, async (req, res) => {
     removePasswordReset(reset.email);
     logSecurityEvent("password_reset_completed", req, { email: maskEmail(reset.email) });
 
-    return res.status(200).json({
-      success: true,
-      message: "Senha atualizada com sucesso. Você já pode entrar.",
-    });
+    return res.status(200).send(renderVerificationPage({
+      title: "Senha atualizada",
+      message: "Sua senha foi redefinida com sucesso. Agora você já pode entrar na NexFinance.",
+      linkLabel: "Ir para o login",
+      linkHref: "/login.html?reset=1",
+    }));
   } catch (error) {
     console.error("Erro ao redefinir senha:", error);
     return res.status(500).json({
