@@ -328,6 +328,15 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
 
     const existingDemoUser = demoUsers.find((user) => user.email === email);
     if (existingDemoUser) {
+      if (!isUserEmailVerified(existingDemoUser)) {
+        pendingRegistrationsByEmail.set(email, existingDemoUser.emailVerificationToken || existingDemoUser.email_verification_token_hash);
+        return res.status(200).json({
+          success: true,
+          requiresEmailVerification: true,
+          message: "Esta conta já foi criada, mas ainda falta confirmar o email. Use o botão de reenvio para receber um novo link.",
+        });
+      }
+
       return res.status(409).json({
         success: false,
         message: "Este email já está cadastrado.",
@@ -341,11 +350,19 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
     if (supabase) {
       const { data: existingUser } = await supabase
         .from("users")
-        .select("id")
+        .select("id, email_verified")
         .eq("email", email)
         .maybeSingle();
 
       if (existingUser) {
+        if (existingUser.email_verified === false) {
+          return res.status(200).json({
+            success: true,
+            requiresEmailVerification: true,
+            message: "Esta conta já foi criada, mas ainda falta confirmar o email. Use o botão de reenvio para receber um novo link.",
+          });
+        }
+
         return res.status(409).json({
           success: false,
           message: "Este email já está cadastrado.",
