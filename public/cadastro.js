@@ -2,6 +2,7 @@
   const form = document.getElementById("cadastroForm");
   const messageBox = document.getElementById("registerMessage");
   const submitButton = form?.querySelector("button[type='submit']");
+  let lastRegistrationEmail = "";
 
   if (!form) return;
 
@@ -15,6 +16,7 @@
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value.trim();
     const confirmPassword = document.getElementById("confirmPassword").value.trim();
+    lastRegistrationEmail = email;
 
     if (!name || !company || !email || !password || !confirmPassword) {
       showMessage("Preencha todos os campos.", "error");
@@ -69,6 +71,7 @@
       localStorage.removeItem("nexfinance_token");
       sessionStorage.removeItem("nexfinance_user");
       showMessage(data.message || "Enviamos um link de validação para o email cadastrado.", "success");
+      showResendVerification(email);
 
       if (data.devVerificationUrl) {
         showDevVerificationLink(data.devVerificationUrl);
@@ -79,6 +82,14 @@
     } finally {
       setLoading(false);
     }
+  });
+
+  messageBox?.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-resend-verification]");
+    if (!button) return;
+
+    event.preventDefault();
+    await resendVerification(button.dataset.resendVerification || lastRegistrationEmail);
   });
 
   function showMessage(message, type) {
@@ -116,6 +127,57 @@
     messageBox.appendChild(helper);
   }
 
+  function showResendVerification(email) {
+    if (!messageBox || !email) return;
+
+    const helper = document.createElement("div");
+    helper.className = "email-verification-helper";
+    helper.innerHTML = `
+      <span>Não recebeu? Confira o spam ou reenvie o link.</span>
+      <button type="button" data-resend-verification="${escapeHtml(email)}">Reenviar email</button>
+    `;
+    messageBox.appendChild(helper);
+  }
+
+  async function resendVerification(email) {
+    if (!email) {
+      showMessage("Informe seu email para reenviar a confirmação.", "error");
+      return;
+    }
+
+    const button = messageBox?.querySelector("[data-resend-verification]");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Reenviando...";
+    }
+
+    try {
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+      showMessage(data.message || "Confira seu email para validar a conta.", response.ok && data.success ? "success" : "error");
+
+      if (response.ok && data.success) {
+        showResendVerification(email);
+      }
+
+      if (data.devVerificationUrl) {
+        showDevVerificationLink(data.devVerificationUrl);
+      }
+    } catch (error) {
+      console.error("Erro ao reenviar validação:", error);
+      showMessage("Não foi possível reenviar o email agora.", "error");
+      showResendVerification(email);
+    }
+  }
+
   function clearMessage() {
     if (!messageBox) return;
     messageBox.textContent = "";
@@ -126,6 +188,15 @@
     if (!submitButton) return;
     submitButton.disabled = isLoading;
     submitButton.textContent = isLoading ? "Criando conta..." : "Criar conta";
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   }
 });
 

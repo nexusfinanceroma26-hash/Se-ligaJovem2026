@@ -136,6 +136,7 @@ app.use("/api/auth/recuperar", sensitiveRouteLimiter);
 app.use("/api/auth/forgot-password", sensitiveRouteLimiter);
 app.use("/api/auth/reset-password", sensitiveRouteLimiter);
 app.use("/api/auth/verify-email", sensitiveRouteLimiter);
+app.use("/api/auth/resend-verification", sensitiveRouteLimiter);
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -410,7 +411,18 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
 
     pendingRegistrationsByEmail.set(email, verification.tokenHash);
 
-    await sendVerificationEmail({ to: email, name, verificationUrl });
+    try {
+      await sendVerificationEmail({ to: email, name, verificationUrl });
+    } catch (emailError) {
+      console.error("Erro ao enviar email de validacao:", emailError);
+      return res.status(202).json({
+        success: true,
+        requiresEmailVerification: true,
+        emailDeliveryWarning: true,
+        message: buildEmailDeliveryFailureMessage(emailError),
+        devVerificationUrl: shouldExposeDevVerificationUrl() ? verificationUrl : undefined,
+      });
+    }
 
     return res.status(201).json({
       success: true,
@@ -525,6 +537,106 @@ app.get("/api/auth/verify-email", async (req, res) => {
     }));
   }
 });
+
+app.post("/api/auth/resend-verification", async (req, res) => {
+  try {
+    let { email } = req.body;
+    const validation = validateEmail(email);
+
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: "Informe um email válido para reenviar a confirmação.",
+        errors: validation.errors,
+      });
+    }
+
+    email = sanitizeInput(email).toLowerCase();
+    const verification = createEmailVerificationToken();
+    const verificationUrl = `${getAppBaseUrl(req)}/api/auth/verify-email?token=${verification.token}`;
+    const verificationExpiresAt = new Date(Date.now() + EMAIL_VERIFICATION_EXPIRES_MS).toISOString();
+    let name = "usuário";
+    let shouldSend = false;
+
+    if (!supabase) {
+      const demoUser = demoUsers.find((user) => user.email === email);
+      if (demoUser && !isUserEmailVerified(demoUser)) {
+        demoUser.emailVerificationToken = verification.tokenHash;
+        demoUser.email_verification_token_hash = verification.tokenHash;
+        demoUser.emailVerificationExpires = verificationExpiresAt;
+        demoUser.email_verification_expires_at = verificationExpiresAt;
+        name = demoUser.full_name || demoUser.name || name;
+        shouldSend = true;
+      }
+    } else {
+      const { data: user, error: queryError } = await supabase
+        .from("users")
+        .select("id, name, email_verified")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (queryError) {
+        return res.status(500).json({
+          success: false,
+          message: "Não foi possível consultar sua conta agora.",
+        });
+      }
+
+      if (user && user.email_verified === false) {
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({
+            email_verification_token_hash: verification.tokenHash,
+            email_verification_expires_at: verificationExpiresAt,
+          })
+          .eq("id", user.id);
+
+        if (updateError) {
+          return res.status(500).json({
+            success: false,
+            message: "Não foi possível gerar um novo link de validação.",
+          });
+        }
+
+        name = user.name || name;
+        shouldSend = true;
+      }
+    }
+
+    // Segurança: resposta genérica evita confirmar se um email está cadastrado.
+    if (!shouldSend) {
+      return res.status(200).json({
+        success: true,
+        message: "Se existir uma conta pendente para este email, enviaremos um novo link de validação.",
+      });
+    }
+
+    pendingRegistrationsByEmail.set(email, verification.tokenHash);
+
+    try {
+      await sendVerificationEmail({ to: email, name, verificationUrl });
+    } catch (emailError) {
+      console.error("Erro ao reenviar email de validacao:", emailError);
+      return res.status(502).json({
+        success: false,
+        message: buildEmailDeliveryFailureMessage(emailError),
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Enviamos um novo link de validação. Confira a caixa de entrada e o spam.",
+      devVerificationUrl: shouldExposeDevVerificationUrl() ? verificationUrl : undefined,
+    });
+  } catch (error) {
+    console.error("Erro ao reenviar validacao de email:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Não conseguimos reenviar o email agora. Tente novamente em instantes.",
+    });
+  }
+});
+
 app.post("/api/auth/login", authLimiter, async (req, res) => {
   try {
     let { email, password } = req.body;
@@ -1266,6 +1378,20 @@ async function verifyGoogleCredential(credential) {
     name: profile.name,
     picture: profile.picture,
   };
+}
+
+function buildEmailDeliveryFailureMessage(error) {
+  const details = String(error?.message || error || "");
+
+  if (details.includes("You can only send testing emails")) {
+    return "O provedor de email está em modo teste e só envia para o email dono da conta Resend. Para liberar outros emails, verifique um domínio no Resend e atualize o EMAIL_FROM.";
+  }
+
+  if (details.includes("RESEND_API_KEY") || details.includes("EMAIL_PROVIDER_API_KEY")) {
+    return "O envio de email ainda não está configurado no servidor. Configure RESEND_API_KEY e EMAIL_FROM.";
+  }
+
+  return "Sua conta foi criada, mas não conseguimos enviar o email de validação agora. Tente reenviar em instantes.";
 }
 
 async function sendVerificationEmail({ to, name, verificationUrl }) {
