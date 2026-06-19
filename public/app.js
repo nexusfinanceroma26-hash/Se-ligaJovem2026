@@ -85,10 +85,10 @@ const seedRows = {
     ["Delta Tech", "Software", "96/100", "Imediato", "OK"],
   ],
   stock: [
-    ["CAF-001", "Café premium 500g", "42", "80", money.format(29.9), "Ruptura"],
-    ["CHA-014", "Chá verde 30 sachês", "310", "120", money.format(18.5), "OK"],
-    ["MEL-220", "Mel silvestre 250g", "76", "60", money.format(24), "Atenção"],
-    ["GRA-092", "Granola 1kg", "18", "50", money.format(37.9), "Ruptura"],
+    ["CAF-001", "Café premium 500g", "42", "80", money.format(29.9), "L-CAF-06", "2026-09-30", "Ruptura"],
+    ["CHA-014", "Chá verde 30 sachês", "310", "120", money.format(18.5), "L-CHA-12", "2027-02-15", "OK"],
+    ["MEL-220", "Mel silvestre 250g", "76", "60", money.format(24), "L-MEL-03", "2026-11-10", "Atenção"],
+    ["GRA-092", "Granola 1kg", "18", "50", money.format(37.9), "L-GRA-18", "2026-08-20", "Ruptura"],
   ],
   sales: [
     ["#1029", "Ana Mercado", money.format(1240), "Pago", "18,2% margem"],
@@ -133,7 +133,7 @@ const seedRows = {
 const rows = loadDatabase(emptyRows);
 
 const pageInfo = {
-  stock: ["Estoque", "Produtos, mínimo ideal, ruptura, giro e previsão de demanda.", ["SKU", "Produto", "Qtd", "Mínimo", "Preço", "Status"]],
+  stock: ["Estoque", "Produtos, lote, validade, mínimo ideal, ruptura, giro e previsão de demanda.", ["SKU", "Produto", "Qtd", "Mínimo", "Preço", "Lote", "Validade", "Status"]],
   sales: ["Vendas", "Pedidos, clientes, pagamentos e margem por operação.", ["Pedido", "Cliente", "Valor", "Status", "Performance"]],
   marketplace: ["Marketplace", "Performance por canal e pedidos integrados.", ["Canal", "Pedido", "Valor", "Status", "Performance"]],
   customers: ["Clientes", "Histórico, ticket, frequência, risco e oportunidades.", ["Cliente", "Segmento", "Ticket total", "Risco", "Histórico"]],
@@ -177,11 +177,16 @@ const drawerSchemas = {
       ["quantity", "Quantidade atual", "Ex: 42"],
       ["minimum", "Estoque mínimo", "Ex: 80"],
       ["price", "Preço de venda", "Ex: 29,90"],
+      ["batch", "Lote", "Ex: L-CAF-06"],
+      ["expiry", "Validade", "2026-12-31"],
       ["status", "Status", "Atenção"],
     ],
     statusOptions: ["OK", "Atenção", "Ruptura"],
-    toRow: (data) => [data.sku || `SKU-${Date.now().toString().slice(-4)}`, data.productName, data.quantity || "0", data.minimum || "0", normalizeValue(data.price), data.status],
-    fromRow: (row) => ({ sku: row[0], productName: row[1], quantity: row[2], minimum: row[3], price: row[4], status: row[5] }),
+    toRow: (data) => [data.sku || `SKU-${Date.now().toString().slice(-4)}`, data.productName, data.quantity || "0", data.minimum || "0", normalizeValue(data.price), data.batch || "Sem lote", data.expiry || "Sem validade", data.status],
+    fromRow: (row) => {
+      const normalized = normalizeStockRow(row);
+      return { sku: normalized[0], productName: normalized[1], quantity: normalized[2], minimum: normalized[3], price: normalized[4], batch: normalized[5], expiry: normalized[6], status: normalized[7] };
+    },
   },
   sales: {
     title: "venda",
@@ -617,11 +622,12 @@ function panel(title, body, foot) {
 
 function tablePanel(title, headers, data, route = null) {
   const tableHeaders = route ? [...headers, "Ações"] : headers;
+  const tableRows = route === "stock" ? data.map(normalizeStockRow) : data;
 
   return panel(title, el("div", { class: "table-wrap" }, [
     el("table", { "data-filterable": "true" }, [
       el("thead", {}, [el("tr", {}, tableHeaders.map((header) => el("th", {}, [header])))]),
-      el("tbody", {}, data.map((row, index) => el("tr", {}, [
+      el("tbody", {}, tableRows.map((row, index) => el("tr", {}, [
         ...row.map((cellValue) => el("td", { html: cell(cellValue) })),
         ...(route ? [el("td", {}, [rowActions(route, index)])] : []),
       ]))),
@@ -739,6 +745,7 @@ function schemaField(route, name, label, placeholder, value = "") {
 }
 
 function inferInputType(name) {
+  if (name === "expiry") return "date";
   return ["ticket", "amount", "quantity", "minimum", "price", "gross", "companyCost", "purchaseValue", "currentValue", "capital"].includes(name) ? "text" : "text";
 }
 
@@ -970,7 +977,7 @@ function getKpis() {
   const financialExpense = rows.financial
     .filter((row) => String(row[2]).toLowerCase().includes("despesa"))
     .reduce((total, row) => total + parseMoney(row[3]), 0);
-  const stockRisk = rows.stock.filter((row) => String(row[5]).toLowerCase().includes("ruptura")).length;
+  const stockRisk = rows.stock.filter((row) => getStockStatus(row).includes("ruptura")).length;
   const expenses = payrollTotal + financialExpense;
   const revenue = salesTotal + financialRevenue;
   const profit = revenue - expenses;
@@ -987,6 +994,15 @@ function getKpis() {
 
 function isBusinessDataEmpty() {
   return ["customers", "suppliers", "stock", "sales", "marketplace", "financial", "payroll", "assets"].every((key) => !rows[key]?.length);
+}
+
+function normalizeStockRow(row = []) {
+  if (row.length >= 8) return row;
+  return [row[0], row[1], row[2], row[3], row[4], "Sem lote", "Sem validade", row[5] || "OK"];
+}
+
+function getStockStatus(row = []) {
+  return String(normalizeStockRow(row)[7] || "").toLowerCase();
 }
 
 function sumRows(data, index) {
@@ -1015,7 +1031,7 @@ function calculateWorkingCapitalGap() {
     .filter((row) => String(row[2]).toLowerCase().includes("receita") && !String(row[4]).toLowerCase().includes("pago"))
     .reduce((total, row) => total + parseMoney(row[3]), 0);
   const stockReplacement = rows.stock
-    .filter((row) => String(row[5]).toLowerCase().includes("ruptura"))
+    .filter((row) => getStockStatus(row).includes("ruptura"))
     .reduce((total, row) => total + parseMoney(row[4]) * Math.max(0, Number(row[3]) - Number(row[2])), 0);
 
   return Math.max(0, payable + stockReplacement - receivable);
@@ -1074,7 +1090,7 @@ function downloadExecutiveReportPdf() {
 }
 
 function buildSmartRecommendations() {
-  const ruptureCount = rows.stock.filter((row) => String(row[5]).toLowerCase().includes("ruptura")).length;
+  const ruptureCount = rows.stock.filter((row) => getStockStatus(row).includes("ruptura")).length;
   const weakSuppliers = rows.suppliers.filter((row) => parseInt(row[2], 10) < 85).length;
   const riskyCustomers = rows.customers.filter((row) => String(row[3]).toLowerCase().includes("alto")).length;
   const payrollCost = sumRows(rows.payroll, 3);

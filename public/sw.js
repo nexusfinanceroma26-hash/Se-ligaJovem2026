@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = "nexfinance-pwa-v19-email-resend-flow";
+﻿const CACHE_NAME = "nexfinance-pwa-v20-stock-batch-expiry";
 const APP_SHELL = [
   "/",
   "/login.html",
@@ -86,6 +86,7 @@ self.addEventListener("fetch", (event) => {
     })),
   );
 });
+
 
 
 
