@@ -1201,7 +1201,10 @@ function buildTrustedOrigins() {
   return new Set([
     ...configuredOrigins,
     "https://se-liga-jovem2026.vercel.app",
+    "https://se-ligajovem2026.vercel.app",
     "https://d-cio-dacio-soares-projects.vercel.app",
+    "https://d-cio-daciosoares009-afk-dacio-soares-projects.vercel.app",
+    "https://d-cio-git-main-dacio-soares-projects.vercel.app",
     "https://d-o4k1xgv9r-dacio-soares-projects.vercel.app",
     `http://localhost:${PORT}`,
     `http://127.0.0.1:${PORT}`,
@@ -1255,7 +1258,11 @@ function isVercelProjectOrigin(origin) {
 
     return (
       hostname === "se-liga-jovem2026.vercel.app" ||
+      hostname === "se-ligajovem2026.vercel.app" ||
       hostname === "d-cio-dacio-soares-projects.vercel.app" ||
+      hostname === "d-cio-daciosoares009-afk-dacio-soares-projects.vercel.app" ||
+      hostname === "d-cio-git-main-dacio-soares-projects.vercel.app" ||
+      /^d-cio(?:-[a-z0-9-]+)?-dacio-soares-projects\.vercel\.app$/.test(hostname) ||
       /^d-[a-z0-9]+-dacio-soares-projects\.vercel\.app$/.test(hostname)
     );
   } catch {
