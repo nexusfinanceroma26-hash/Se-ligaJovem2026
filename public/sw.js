@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = "nexfinance-pwa-v20-stock-batch-expiry";
+﻿const CACHE_NAME = "nexfinance-pwa-v21-full-refresh";
 const APP_SHELL = [
   "/",
   "/login.html",
@@ -31,6 +31,12 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()),
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("activate", (event) => {
@@ -86,6 +92,7 @@ self.addEventListener("fetch", (event) => {
     })),
   );
 });
+
 
 
 
