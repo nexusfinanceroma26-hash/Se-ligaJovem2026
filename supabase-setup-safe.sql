@@ -107,6 +107,12 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS user_app_data (
+  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_email_verified ON users(email_verified);
@@ -118,6 +124,7 @@ CREATE INDEX IF NOT EXISTS idx_transactions_company_id ON transactions(company_i
 CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);
 CREATE INDEX IF NOT EXISTS idx_products_company_id ON products(company_id);
 CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
+CREATE INDEX IF NOT EXISTS idx_user_app_data_updated_at ON user_app_data(updated_at);
 
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE companies DISABLE ROW LEVEL SECURITY;
@@ -125,7 +132,8 @@ ALTER TABLE customers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE suppliers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE products DISABLE ROW LEVEL SECURITY;
+ALTER TABLE user_app_data DISABLE ROW LEVEL SECURITY;
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON users, companies, customers, suppliers, transactions, products TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON users, companies, customers, suppliers, transactions, products, user_app_data TO anon, authenticated;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;

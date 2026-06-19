@@ -48,6 +48,7 @@ const pendingRegistrationsByToken = new Map();
 const pendingRegistrationsByEmail = new Map();
 const pendingPasswordResetsByToken = new Map();
 const pendingPasswordResetsByEmail = new Map();
+const demoAppDataByUser = new Map();
 const EMAIL_VERIFICATION_EXPIRES_MS = 1000 * 60 * 60 * 24;
 const PASSWORD_RESET_EXPIRES_MS = 1000 * 60 * 60;
 
@@ -77,8 +78,8 @@ app.use(cors({
   credentials: true,
   optionsSuccessStatus: 200,
 }));
-app.use(express.json({ limit: "120kb" }));
-app.use(express.urlencoded({ extended: true, limit: "120kb" }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -972,6 +973,83 @@ app.get("/api/dashboard", verifyToken, async (req, res) => {
    }
 });
 
+app.get("/api/data", verifyToken, async (req, res) => {
+  const userId = String(req.user.id || "");
+
+  if (!supabase || userId.startsWith("demo")) {
+    return res.status(200).json({
+      success: true,
+      data: demoAppDataByUser.get(userId) || {},
+      source: "memory",
+    });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("user_app_data")
+      .select("data, updated_at")
+      .eq("user_id", req.user.id)
+      .maybeSingle();
+
+    if (error) {
+      return handleAppDataError(res, error);
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: data?.data || {},
+      updatedAt: data?.updated_at || null,
+      source: "supabase",
+    });
+  } catch (error) {
+    console.error("Erro ao carregar dados do usuário:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Não foi possível carregar os dados do dashboard.",
+    });
+  }
+});
+
+app.put("/api/data", verifyToken, async (req, res) => {
+  const userId = String(req.user.id || "");
+  const safeData = sanitizeAppData(req.body?.data);
+
+  if (!supabase || userId.startsWith("demo")) {
+    demoAppDataByUser.set(userId, safeData);
+    return res.status(200).json({
+      success: true,
+      message: "Dados salvos em modo local do servidor.",
+      source: "memory",
+    });
+  }
+
+  try {
+    const { error } = await supabase
+      .from("user_app_data")
+      .upsert({
+        user_id: req.user.id,
+        data: safeData,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" });
+
+    if (error) {
+      return handleAppDataError(res, error);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Dados salvos com segurança.",
+      source: "supabase",
+    });
+  } catch (error) {
+    console.error("Erro ao salvar dados do usuário:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Não foi possível salvar os dados do dashboard.",
+    });
+  }
+});
+
 app.post("/api/auth/logout", (req, res) => {
   res.clearCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
   return res.status(200).json({
@@ -1745,6 +1823,47 @@ function demoDashboard() {
     hasBusinessData: false,
     message: "Cadastre vendas, estoque, fornecedores e lançamentos financeiros para ativar os indicadores.",
   };
+}
+
+function sanitizeAppData(data = {}) {
+  const allowedKeys = [
+    "customers", "suppliers", "stock", "sales", "marketplace", "financial",
+    "capital", "payroll", "assets", "investors",
+  ];
+
+  return allowedKeys.reduce((safe, key) => {
+    const rows = Array.isArray(data[key]) ? data[key] : [];
+    safe[key] = rows
+      .slice(0, 500)
+      .map((row) => sanitizeAppDataRow(row))
+      .filter((row) => row.length);
+    return safe;
+  }, {});
+}
+
+function sanitizeAppDataRow(row) {
+  if (!Array.isArray(row)) return [];
+
+  return row
+    .slice(0, 12)
+    .map((cell) => sanitizeInput(String(cell ?? "").slice(0, 300)));
+}
+
+function handleAppDataError(res, error) {
+  const details = String(error?.message || "");
+
+  if (error?.code === "42P01" || details.includes("user_app_data")) {
+    return res.status(503).json({
+      success: false,
+      message: "A tabela user_app_data ainda não existe no Supabase. Rode o supabase-setup-safe.sql atualizado.",
+    });
+  }
+
+  console.error("Erro Supabase user_app_data:", error);
+  return res.status(500).json({
+    success: false,
+    message: "Não foi possível sincronizar os dados no servidor.",
+  });
 }
 
 function summarizeBusinessDataForAi(data = {}) {

@@ -109,6 +109,13 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ===== DADOS DO APP POR USUARIO =====
+CREATE TABLE IF NOT EXISTS user_app_data (
+  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ===== ÍNDICES PARA PERFORMANCE =====
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_email_verified ON users(email_verified);
@@ -120,6 +127,7 @@ CREATE INDEX idx_transactions_company_id ON transactions(company_id);
 CREATE INDEX idx_transactions_type ON transactions(type);
 CREATE INDEX idx_products_company_id ON products(company_id);
 CREATE INDEX idx_products_sku ON products(sku);
+CREATE INDEX IF NOT EXISTS idx_user_app_data_updated_at ON user_app_data(updated_at);
 
 -- ===== SEGURANÇA =====
 -- Desabilitamos o RLS por enquanto para que seu servidor Node.js 
@@ -130,6 +138,7 @@ ALTER TABLE customers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE suppliers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE products DISABLE ROW LEVEL SECURITY;
+ALTER TABLE user_app_data DISABLE ROW LEVEL SECURITY;
 
 -- Comentário para documentação
 COMMENT ON TABLE users IS 'Tabela de usuários do sistema NexFinance';

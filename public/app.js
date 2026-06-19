@@ -131,6 +131,8 @@ const seedRows = {
 };
 
 const rows = loadDatabase(emptyRows);
+let saveSyncTimer = null;
+let isSyncingFromServer = false;
 
 const pageInfo = {
   stock: ["Estoque", "Produtos, lote, validade, mínimo ideal, ruptura, giro e previsão de demanda.", ["SKU", "Produto", "Qtd", "Mínimo", "Preço", "Lote", "Validade", "Status"]],
@@ -902,11 +904,84 @@ function loadDatabase(seed) {
 
 function saveDatabase() {
   localStorage.setItem(getDatabaseKey(), JSON.stringify(rows));
+  syncDatabaseToServer();
 }
 
 function getDatabaseKey() {
   const identifier = state?.user?.id || state?.user?.email || "guest";
   return `nexfinance_database_${String(identifier).toLowerCase()}`;
+}
+
+function replaceRows(nextRows = {}) {
+  Object.keys(emptyRows).forEach((key) => {
+    rows[key] = Array.isArray(nextRows[key]) ? nextRows[key] : [];
+  });
+}
+
+function hasAnyBusinessRows(data = rows) {
+  return Object.keys(emptyRows).some((key) => Array.isArray(data[key]) && data[key].length > 0);
+}
+
+async function syncDatabaseFromServer() {
+  if (isSyncingFromServer) return;
+  isSyncingFromServer = true;
+
+  try {
+    const response = await fetch("/api/data", {
+      credentials: "same-origin",
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok || !payload.success) {
+      console.warn("Sincronização indisponível:", payload.message || response.status);
+      return;
+    }
+
+    const serverData = payload.data || {};
+    const localData = loadDatabase(emptyRows);
+
+    if (hasAnyBusinessRows(serverData)) {
+      replaceRows(serverData);
+      localStorage.setItem(getDatabaseKey(), JSON.stringify(rows));
+      return;
+    }
+
+    if (hasAnyBusinessRows(localData)) {
+      replaceRows(localData);
+      await syncDatabaseToServer({ immediate: true });
+    }
+  } catch (error) {
+    console.warn("Não foi possível sincronizar com o servidor:", error);
+  } finally {
+    isSyncingFromServer = false;
+  }
+}
+
+function syncDatabaseToServer(options = {}) {
+  if (isSyncingFromServer) return Promise.resolve();
+
+  const send = async () => {
+    try {
+      await fetch("/api/data", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ data: rows }),
+      });
+    } catch (error) {
+      console.warn("Dados mantidos no aparelho. Sincronização falhou:", error);
+    }
+  };
+
+  if (options.immediate) {
+    return send();
+  }
+
+  clearTimeout(saveSyncTimer);
+  saveSyncTimer = setTimeout(send, 450);
+  return Promise.resolve();
 }
 
 function saveDrawerRecord(event) {
@@ -1411,6 +1486,9 @@ async function initSecureDashboard() {
     const data = await response.json();
     sessionStorage.setItem("nexfinance_user", JSON.stringify(data.user));
     state.user = readUser();
+    replaceRows(loadDatabase(emptyRows));
+    render();
+    await syncDatabaseFromServer();
     render();
   } catch {
     window.location.href = "login.html";
